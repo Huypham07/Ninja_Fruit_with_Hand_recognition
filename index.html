@@ -11,19 +11,27 @@
         margin: 0;
         padding: 0;
         background-color: #000;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
       }
       #bottom {
         background-image: url(assets/bg.jpg);
+        background-size: cover;
+        background-position: center;
       }
       .canvas {
         display: none;
         position: absolute;
         z-index: 0;
+        width: 90vw;
+        height: 90vh;
+        max-width: 1080px;
+        max-height: 600px;
         left: 50%;
         top: 50%;
-        width: 1080px;
-        height: 600px;
-        margin: -300px auto auto -540px;
+        transform: translate(-50%, -50%);
       }
       #camera-feed {
         object-fit: cover;
@@ -36,6 +44,17 @@
     <canvas class="canvas" id="middle" style="display: none">Your borwser does not suport html5 canvans!</canvas>
     <canvas class="canvas" id="top" style="display: none">Your borwser does not suport html5 canvans!</canvas>
     <canvas id="canvas" style="border: 1px solid black; display: none" style="display: none"></canvas>
+
+    <script>
+      function resizeCanvas() {
+        document.querySelectorAll(".canvas").forEach((canvas) => {
+          canvas.style.width = Math.min(window.innerWidth * 0.9, 1080) + "px";
+          canvas.style.height = Math.min(window.innerHeight * 0.9, 600) + "px";
+        });
+      }
+      window.addEventListener("resize", resizeCanvas);
+      window.addEventListener("load", resizeCanvas);
+    </script>
 
     <!-- libs -->
     <!-- <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script> -->

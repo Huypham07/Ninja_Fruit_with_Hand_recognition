@@ -22,7 +22,6 @@ function init() {
 
   bottomCanvas = document.getElementById("bottom");
   bottomCanvas.style.display = "block";
-  bottomCanvas.style.dispaly = "none"; // Lỗi chính tả từ mã nguồn gốc
   bottomCanvas.width = gameWidth;
   bottomCanvas.height = gameHeight;
   bottomContext = bottomCanvas.getContext("2d");
@@ -55,7 +54,21 @@ function init() {
   gameLevel = 0.1;
 
   // Use hand tracking or mouse to control
-  topCanvas.addEventListener("mousemove", mousemove, false);
+
+  topCanvas.addEventListener("mousedown", (e) => {
+    isDragging = true; // Khi nhấn chuột, bắt đầu vẽ
+    updateMousePosition(e);
+  });
+
+  topCanvas.addEventListener("mousemove", (e) => {
+    if (isDragging) {
+      updateMousePosition(e);
+    }
+  });
+
+  topCanvas.addEventListener("mouseup", () => {
+    isDragging = false; // Khi thả chuột, dừng vẽ
+  });
   //   handtracking = new HandTracking(topCanvas.width, topCanvas.height);
   //   handtracking.tracker.params.simple = true;
   //   handtracking.addEventListener("handmove", handmove);
@@ -131,21 +144,15 @@ function replay(e) {
 }
 
 //mouse event
-function mousemove(e) {
-  // Get the mouse position relative to the canvas element.
-  if (e.layerX || e.layerX == 0) {
-    // Firefox
-    mouse.x = e.layerX;
-    mouse.y = e.layerY;
-  } else if (e.offsetX || e.offsetX == 0) {
-    // Opera
-    mouse.x = e.offsetX;
-    mouse.y = e.offsetY;
-  }
+function updateMousePosition(e) {
+  mouse.x = e.offsetX;
+  mouse.y = e.offsetY;
   buildBladeParticle(mouse.x, mouse.y);
 }
+
 //hand tracking event
 function handmove(e) {
+  console.log(e);
   buildBladeParticle(e.x, e.y);
 }
 //render canvas
