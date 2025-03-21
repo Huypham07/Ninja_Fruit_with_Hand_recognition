@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ninja Fruit Game</title>
+    <style>
+      body,
+      html {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #000;
+      }
+      #bottom {
+        background-image: url(assets/bg.jpg);
+      }
+      .canvas {
+        display: none;
+        position: absolute;
+        z-index: 0;
+        left: 50%;
+        top: 50%;
+        width: 1080px;
+        height: 600px;
+        margin: -300px auto auto -540px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas class="canvas" id="bottom" style="display: none">Your borwser does not suport html5 canvans!</canvas>
+    <canvas class="canvas" id="shadow" style="display: none">Your borwser does not suport html5 canvans!</canvas>
+    <canvas class="canvas" id="middle" style="display: none">Your borwser does not suport html5 canvans!</canvas>
+    <canvas class="canvas" id="top" style="display: none">Your borwser does not suport html5 canvans!</canvas>
+    <canvas id="canvas" style="border: 1px solid black; display: none" style="display: none"></canvas>
+
+    <!-- libs -->
+    <!-- <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/easing/EasePack.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/TweenLite.min.js"></script>
+    <script
+      type="text/javascript"
+      src="https://cdnjs.cloudflare.com/ajax/libs/PreloadJS/1.0.1/preloadjs.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/SoundJS/1.0.2/soundjs.min.js"></script>
+    <script type="text/javascript" src="libs/spp.min.js"></script>
+    <script type="text/javascript" src="libs/utils.js"></script>
+
+    <!-- logic game -->
+    <script type="text/javascript" src="src/FruitGame.js"></script>
+    <script type="text/javascript" src="src/Assets.js"></script>
+    <script type="text/javascript" src="src/AssetsManager.js"></script>
+    <script type="text/javascript" src="src/Collide.js"></script>
+    <script type="text/javascript" src="src/Fruit.js"></script>
+    <script type="text/javascript" src="src/Module_fruit.js"></script>
+    <script type="text/javascript" src="src/Module_bomb.js"></script>
+    <script type="text/javascript" src="src/Module_collide.js"></script>
+    <script type="text/javascript" src="src/Module_blade.js"></script>
+    <script type="text/javascript" src="src/Module_ui.js"></script>
+    <script type="text/javascript" src="src/Game.js"></script>
+    <script type="text/javascript" src="src/ShadowRenderer.js"></script>
+  </body>
+</html>
