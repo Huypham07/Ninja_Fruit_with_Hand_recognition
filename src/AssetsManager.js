@@ -1,58 +1,58 @@
-FruitGame.AssetsManager=function() 
-{
-	SPP.EventDispatcher.call(this);
-	var _this=this,i=0,j=0;
-	var fruitsDir="assets/fruits/";
-	var fruitStateLabels=["w","l","r","s","j"];
-	var fruitImageType=".png";
+class AssetsManager extends SPP.EventDispatcher {
+  constructor() {
+    super();
 
-	this.fruitsObj={};
-	this.fruitsArray=[];
-	this.images={};
-	this.sounds={};
-	this.loader = new createjs.LoadQueue();
-	this.loader.installPlugin(createjs.Sound);
-	var handleComplete=function()
-	{
-		var fruits=FruitGame.assets.fruits;
-		for(i=0;i<fruits.length;i++)
-		{
-			var obj={};
-			for(j=0;j<fruitStateLabels.length;j++)
-			{
-				obj[fruitStateLabels[j]]=_this.loader.getResult(fruits[i]+fruitStateLabels[j]);
-			}
-			_this.fruitsArray.push(obj);
-			_this.fruitsObj[fruits[i]]=obj;
-		}
-		var other=FruitGame.assets.other;
-		for(i=0;i<other.length;i++)
-		{
-			_this[other[i].id]=_this.loader.getResult(other[i].id);
-		};
-		_this.dispatchEvent(new SPP.Event("complete"));
-	};
-	this.loader.addEventListener("complete", handleComplete);
-	
-	this.start=function()
-	{
-		var fruits=FruitGame.assets.fruits;
-		for(i=0;i<fruits.length;i++)
-		{
-			for(j=0;j<fruitStateLabels.length;j++)
-			{
-				this.loader.loadFile(
-				{
-					id:fruits[i]+fruitStateLabels[j], 
-					src:fruitsDir+fruits[i]+"-"+fruitStateLabels[j]+fruitImageType
-				},false);
-			}
-		};
-		this.loader.loadManifest(FruitGame.assets.other,false);
-		this.loader.load();
-	};
-	this.getRandomFruit=function()
-	{
-		return this.fruitsArray[this.fruitsArray.length*Math.random()>>0];
-	};
-};
+    this.fruitsDir = "assets/fruits/";
+    this.fruitStateLabels = ["w", "l", "r", "s", "j"];
+    this.fruitImageType = ".png";
+
+    this.fruitsObj = {};
+    this.fruitsArray = [];
+    this.images = {};
+    this.sounds = {};
+    this.loader = new createjs.LoadQueue();
+    this.loader.installPlugin(createjs.Sound);
+
+    this.loader.addEventListener("complete", () => this.handleComplete());
+  }
+
+  handleComplete() {
+    const fruits = Game.assets.fruits;
+    for (let i = 0; i < fruits.length; i++) {
+      let obj = {};
+      for (let j = 0; j < this.fruitStateLabels.length; j++) {
+        obj[this.fruitStateLabels[j]] = this.loader.getResult(fruits[i] + this.fruitStateLabels[j]);
+      }
+      this.fruitsArray.push(obj);
+      this.fruitsObj[fruits[i]] = obj;
+    }
+
+    const other = Game.assets.other;
+    for (let i = 0; i < other.length; i++) {
+      this[other[i].id] = this.loader.getResult(other[i].id);
+    }
+
+    this.dispatchEvent(new SPP.Event("complete"));
+  }
+
+  start() {
+    const fruits = Game.assets.fruits;
+    for (let i = 0; i < fruits.length; i++) {
+      for (let j = 0; j < this.fruitStateLabels.length; j++) {
+        this.loader.loadFile(
+          {
+            id: fruits[i] + this.fruitStateLabels[j],
+            src: `${this.fruitsDir}${fruits[i]}-${this.fruitStateLabels[j]}${this.fruitImageType}`,
+          },
+          false
+        );
+      }
+    }
+    this.loader.loadManifest(Game.assets.other, false);
+    this.loader.load();
+  }
+
+  getRandomFruit() {
+    return this.fruitsArray[Math.floor(this.fruitsArray.length * Math.random())];
+  }
+}

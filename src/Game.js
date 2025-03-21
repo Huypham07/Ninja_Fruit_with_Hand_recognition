@@ -1,7 +1,7 @@
 window.onload = loadAssets;
 
 function loadAssets() {
-  assetsManager = new FruitGame.AssetsManager();
+  assetsManager = new AssetsManager();
   assetsManager.addEventListener("complete", init);
   assetsManager.start();
 }
@@ -22,13 +22,16 @@ function init() {
 
   bottomCanvas = document.getElementById("bottom");
   bottomCanvas.style.display = "block";
-  bottomCanvas.style.dispaly = "none";
+  bottomCanvas.style.dispaly = "none"; // Lỗi chính tả từ mã nguồn gốc
   bottomCanvas.width = gameWidth;
   bottomCanvas.height = gameHeight;
   bottomContext = bottomCanvas.getContext("2d");
   bottomContext.fillStyle = "#f6c223";
   bottomContext.textAlign = "left";
   bottomContext.textBaseline = "top";
+
+  // Khởi tạo hệ thống camera
+  initCamera();
 
   //particle system
   particleSystem = new SPP.ParticleSystem();
@@ -42,7 +45,7 @@ function init() {
   gravity = new SPP.Gravity(0.15);
 
   //data
-  if (typeof chrome.storage != "undefined") storage = chrome.storage.local;
+  if (typeof chrome !== "undefined" && typeof chrome.storage != "undefined") storage = chrome.storage.local;
   else storage = window.localStorage;
   if (!storage.highScore) storage.highScore = 0;
   gameState = GAME_READY;
@@ -53,9 +56,9 @@ function init() {
 
   // Use hand tracking or mouse to control
   topCanvas.addEventListener("mousemove", mousemove, false);
-//   handtracking = new HandTracking(topCanvas.width, topCanvas.height);
-//   handtracking.tracker.params.simple = true;
-//   handtracking.addEventListener("handmove", handmove);
+  //   handtracking = new HandTracking(topCanvas.width, topCanvas.height);
+  //   handtracking.tracker.params.simple = true;
+  //   handtracking.addEventListener("handmove", handmove);
 
   render();
   enterGame();
@@ -152,12 +155,15 @@ function render() {
   topContext.clearRect(0, 0, gameWidth, gameHeight);
   middleContext.clearRect(0, 0, gameWidth, gameHeight);
   bottomContext.clearRect(0, 0, gameWidth, gameHeight);
-//   handtracking.tick();
+  //   handtracking.tick();
 
-  showScoreTextUI();
+  // Render camera background nếu đang sử dụng
+  renderCameraBackground();
+
   fruitSystem.render();
   bombSystem.render();
   particleSystem.render();
+  showScoreTextUI();
   bladeSystem.render();
 
   buildColorBlade(bladeColor, bladeWidth);
@@ -165,11 +171,3 @@ function render() {
   levelUpdate();
   renderTimer();
 }
-
-var GameControl = {
-  message: "Game Control",
-  moveThreshold: 5,
-  depthThreshold: 70,
-  displayShadow: true,
-  mirror: true,
-};
