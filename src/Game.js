@@ -56,19 +56,31 @@ function init() {
   // Use hand tracking or mouse to control
 
   topCanvas.addEventListener("mousedown", (e) => {
-    isDragging = true; // Khi nhấn chuột, bắt đầu vẽ
-    updateMousePosition(e);
-  });
+  isDragging = true;
+  updateMousePosition(e);
+});
 
-  topCanvas.addEventListener("mousemove", (e) => {
-    if (isDragging) {
-      updateMousePosition(e);
-    }
-  });
+topCanvas.addEventListener("mousemove", (e) => {
+  if (isDragging) updateMousePosition(e);
+});
 
-  topCanvas.addEventListener("mouseup", () => {
-    isDragging = false; // Khi thả chuột, dừng vẽ
-  });
+topCanvas.addEventListener("mouseup", () => {
+  isDragging = false;
+});
+
+// Sự kiện cảm ứng (Mobile)
+topCanvas.addEventListener("touchstart", (e) => {
+  isDragging = true;
+  updateMousePosition(e.touches[0]); // Lấy vị trí ngón tay đầu tiên
+});
+
+topCanvas.addEventListener("touchmove", (e) => {
+  if (isDragging) updateMousePosition(e.touches[0]);
+});
+
+topCanvas.addEventListener("touchend", () => {
+  isDragging = false;
+});
   //   handtracking = new HandTracking(topCanvas.width, topCanvas.height);
   //   handtracking.tracker.params.simple = true;
   //   handtracking.addEventListener("handmove", handmove);
@@ -145,8 +157,9 @@ function replay(e) {
 
 //mouse event
 function updateMousePosition(e) {
-  mouse.x = e.offsetX;
-  mouse.y = e.offsetY;
+  let rect = topCanvas.getBoundingClientRect(); // Lấy tọa độ canvas trên màn hình
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
   buildBladeParticle(mouse.x, mouse.y);
 }
 
