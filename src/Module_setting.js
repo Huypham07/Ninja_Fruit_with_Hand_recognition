@@ -7,17 +7,54 @@ const Module_setting = (function() {
     let settingsContent;
     let soundToggle;
     let cameraToggle;
-    let pauseToggle;
     let countdownElement;
+    let overlayElement;
     
     // Game settings state
     const gameSettings = {
         soundEnabled: true,
-        cameraEnabled: true,
+        cameraEnabled: false,
         gamePaused: false
     };
 
     // Private methods
+
+    function createOverlay() {
+        overlayElement = document.createElement('div');
+        overlayElement.id = 'settings-overlay';
+        overlayElement.style.position = 'fixed';
+        overlayElement.style.top = '0';
+        overlayElement.style.left = '0';
+        overlayElement.style.width = '100%';
+        overlayElement.style.height = '100%';
+        overlayElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        overlayElement.style.zIndex = '900';  // Below settings panel but above game
+        overlayElement.style.display = 'none';
+        document.body.appendChild(overlayElement);
+    }
+
+    function toggleSettings(show) {
+        settingsContent.style.display = show ? 'block' : 'none';
+        overlayElement.style.display = show ? 'block' : 'none';
+        
+        if (show) {
+            gameSettings.gamePaused = true;
+            pauseGame();
+        } else {
+            // Only show countdown if game is in progress
+            if (window.game && window.game.isGameStarted) {
+                showCountdown(() => {
+                    gameSettings.gamePaused = false;
+                    resumeGame();
+                });
+            } else {
+                // If game hasn't started yet, just resume without countdown
+                gameSettings.gamePaused = false;
+                resumeGame();
+            }
+        }
+    }
+
     function toggleSound(enabled) {
         gameSettings.soundEnabled = enabled;
         
@@ -51,16 +88,20 @@ const Module_setting = (function() {
         if (!countdownElement) {
             countdownElement = document.createElement('div');
             countdownElement.id = 'game-countdown';
-            countdownElement.style.position = 'absolute';
+            countdownElement.style.position = 'fixed';
             countdownElement.style.left = '50%';
             countdownElement.style.top = '50%';
             countdownElement.style.transform = 'translate(-50%, -50%)';
-            countdownElement.style.fontSize = '100px';
+            countdownElement.style.fontSize = '120px';
             countdownElement.style.fontWeight = 'bold';
             countdownElement.style.color = '#fff';
-            countdownElement.style.textShadow = '0 0 10px #000';
+            countdownElement.style.textShadow = '2px 2px 10px rgba(0, 0, 0, 0.8)';
             countdownElement.style.zIndex = '1000';
             countdownElement.style.display = 'none';
+            countdownElement.style.fontFamily = 'Arial, sans-serif';
+            countdownElement.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            countdownElement.style.padding = '20px 40px';
+            countdownElement.style.borderRadius = '20px';
             document.body.appendChild(countdownElement);
         }
         return countdownElement;
@@ -68,19 +109,30 @@ const Module_setting = (function() {
     
     // Show countdown before resuming the game
     function showCountdown(callback) {
-        const countdown = getCountdownElement();
+        const countdown = document.getElementById('countdown');
+        if (!countdown) {
+            console.error('Countdown element not found');
+            return;
+        }
+    
         countdown.style.display = 'block';
-        
         let count = 3;
         countdown.textContent = count;
-        
+
         const interval = setInterval(() => {
             count--;
             if (count > 0) {
                 countdown.textContent = count;
+                // Play sound for each number if sound is enabled
+                if (gameSettings.soundEnabled && window.createjs && createjs.Sound) {
+                    createjs.Sound.play('countdown');
+                }
             } else {
                 clearInterval(interval);
                 countdown.style.display = 'none';
+                if (gameSettings.soundEnabled && window.createjs && createjs.Sound) {
+                    createjs.Sound.play('start');
+                }
                 if (callback) callback();
             }
         }, 1000);
@@ -157,14 +209,16 @@ const Module_setting = (function() {
             settingsContent = document.getElementById('settings-content');
             soundToggle = document.getElementById('sound-toggle');
             cameraToggle = document.getElementById('camera-toggle');
-            pauseToggle = document.getElementById('pause-toggle');
             
-            // Create countdown element
+            
+            // Create overlay and countdown elements
+            createOverlay();
             getCountdownElement();
             
             // Set up event handlers
             settingsToggle.addEventListener('click', function() {
-                settingsContent.style.display = settingsContent.style.display === 'block' ? 'none' : 'block';
+                const isShowing = settingsContent.style.display === 'block';
+                toggleSettings(!isShowing);
             });
             
             soundToggle.addEventListener('change', function() {
@@ -174,35 +228,21 @@ const Module_setting = (function() {
             cameraToggle.addEventListener('change', function() {
                 toggleCamera(this.checked);
             });
-            
-            pauseToggle.addEventListener('change', function() {
-                togglePause(this.checked);
-            });
 
             // Initialize camera if Module_camera.js is loaded
             if (typeof initCamera === 'function') {
-                // Make sure camera module is initialized
                 initCamera();
-                
-                // Set initial camera state based on setting
-                toggleCamera(gameSettings.cameraEnabled);
+                cameraToggle.checked = false;  // Ensure toggle switch is off
+                toggleCamera(false);  // Ensure camera starts disabled
             }
-
-            // Add keyboard shortcut for pause (Escape key)
-            document.addEventListener('keydown', function(event) {
-                if (event.key === 'Escape') {
-                    pauseToggle.checked = !pauseToggle.checked;
-                    togglePause(pauseToggle.checked);
-                }
-            });
 
             // Expose settings to global scope for other modules
             window.gameSettings = gameSettings;
             
             console.log('Settings module initialized');
         },
-        
-        // Public methods to control settings programmatically
+
+        // Update public methods
         setSoundEnabled: function(enabled) {
             soundToggle.checked = enabled;
             toggleSound(enabled);
@@ -213,17 +253,10 @@ const Module_setting = (function() {
             toggleCamera(enabled);
         },
         
-        setPaused: function(paused) {
-            pauseToggle.checked = paused;
-            togglePause(paused);
-        },
-        
-        // Get current settings
         getSettings: function() {
             return {...gameSettings};
         },
         
-        // Check if game is paused
         isPaused: function() {
             return gameSettings.gamePaused;
         }
