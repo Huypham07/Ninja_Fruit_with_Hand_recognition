@@ -46,14 +46,10 @@
     if (gameState == GAME_READY) {
       return;
     }
+
     bottomContext.font = "36px Courier-Bold";
     bottomContext.lineWidth = 4;
-
     bottomContext.strokeStyle = "rgba(0, 0, 0, 0.7)";
-
-    // bottomContext.font = "18px Courier-Bold";
-    // bottomContext.strokeText("Score:", 10, 20);
-    // bottomContext.fillText("Score:", 10, 20);
 
     bottomContext.font = "36px Courier-Bold";
     bottomContext.strokeText(" " + score, 50, 10);
@@ -81,6 +77,25 @@
     }
     if (ui_gameLife != undefined) {
       ui_gameLife.life = 0;
+    }
+  };
+
+  // Functions for controlling hand tracking
+  toggleHandTracking = function (enable) {
+    isHandTrackingEnabled = enable;
+
+    if (isHandTrackingEnabled) {
+      // Initialize MediaPipe hand tracking
+      if (!mediaHandTracking) {
+        mediaHandTracking = new MediaPipeHandTracking(topCanvas.width, topCanvas.height);
+        mediaHandTracking.addEventListener("handmove", handmove);
+      }
+
+      // Update button text
+      handTrackingButton.textContent = "Use Mouse";
+      isDragging = false; // Disable mouse dragging
+    } else {
+      handTrackingButton.textContent = "Use Hand Tracking";
     }
   };
 

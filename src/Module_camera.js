@@ -2,6 +2,8 @@
 (function () {
   var videoElement;
   var switchButton;
+  var handTrackingButton;
+  var isHandTrackingEnabled = false;
 
   // Khởi tạo camera
   initCamera = function () {
@@ -20,6 +22,7 @@
     document.body.appendChild(videoElement);
 
     createSwitchButton();
+    createHandTrackingButton();
     toggleCameraBackground(isUsingCamera);
   };
 
@@ -46,6 +49,56 @@
     document.body.appendChild(switchButton);
   };
 
+  createHandTrackingButton = function () {
+    handTrackingButton = document.createElement("button");
+    handTrackingButton.id = "hand-tracking-toggle";
+    handTrackingButton.textContent = "Use Hand Tracking";
+    handTrackingButton.style.position = "absolute";
+    handTrackingButton.style.bottom = "10px";
+    handTrackingButton.style.left = "150px";
+    handTrackingButton.style.zIndex = "100";
+    handTrackingButton.style.padding = "8px 16px";
+    handTrackingButton.style.borderRadius = "4px";
+    handTrackingButton.style.border = "none";
+    handTrackingButton.style.backgroundColor = "#f6c223";
+    handTrackingButton.style.color = "#000";
+    handTrackingButton.style.cursor = "pointer";
+    handTrackingButton.style.fontWeight = "bold";
+    handTrackingButton.style.display = "none"; // Hide by default
+
+    handTrackingButton.addEventListener("click", function () {
+      toggleHandTracking(!isHandTrackingEnabled);
+    });
+
+    document.body.appendChild(handTrackingButton);
+  };
+
+  // Toggle hand tracking
+  toggleHandTracking = function (enable) {
+    isHandTrackingEnabled = enable;
+
+    if (isHandTrackingEnabled) {
+      // Initialize MediaPipe hand tracking
+      if (!mediaHandTracking) {
+        mediaHandTracking = new MediaPipeHandTracking(topCanvas.width, topCanvas.height);
+
+        // Set the video source for MediaPipe
+        if (videoElement && videoElement.srcObject) {
+          mediaHandTracking.videoElement = videoElement;
+          mediaHandTracking.startProcessing();
+        }
+
+        mediaHandTracking.addEventListener("handmove", handmove);
+      }
+
+      // Update button text
+      handTrackingButton.textContent = "Use Mouse";
+      isDragging = false; // Disable mouse dragging
+    } else {
+      handTrackingButton.textContent = "Use Hand Tracking";
+    }
+  };
+
   // Bật/tắt camera và cập nhật background
   toggleCameraBackground = function (useCamera) {
     isUsingCamera = useCamera;
@@ -55,22 +108,32 @@
         navigator.mediaDevices
           .getUserMedia({
             video: {
-              facingMode: "user", // Nếu bị mirror, đổi thành "environment"
+              facingMode: "user",
               width: { ideal: gameWidth },
               height: { ideal: gameHeight },
             },
           })
           .then(function (stream) {
             videoElement.srcObject = stream;
-            videoElement.style.display = "none";
+            videoElement.style.display = "block"; // Make sure it's visible for MediaPipe
             bottomCanvas.style.backgroundImage = "none";
-              switchButton.textContent = "Use Image";
+            switchButton.textContent = "Use Image";
+
+            // Show hand tracking toggle button
+            handTrackingButton.style.display = "block";
+
+            // If MediaPipe hand tracking is enabled, initialize it with the new stream
+            if (isHandTrackingEnabled && mediaHandTracking) {
+              mediaHandTracking.videoElement = videoElement;
+              mediaHandTracking.startProcessing();
+            }
           })
           .catch(function (error) {
             console.error("Không thể truy cập camera: ", error);
             isUsingCamera = false;
             switchButton.textContent = "Camera Error";
             setTimeout(() => (switchButton.textContent = "Use Camera"), 2000);
+            handTrackingButton.style.display = "none";
           });
       }
     } else {
@@ -81,6 +144,12 @@
       videoElement.style.display = "none";
       bottomCanvas.style.backgroundImage = "url(assets/bg.jpg)";
       switchButton.textContent = "Use Camera";
+
+      // Hide hand tracking toggle button and disable hand tracking
+      handTrackingButton.style.display = "none";
+      if (isHandTrackingEnabled) {
+        toggleHandTracking(false);
+      }
     }
   };
 

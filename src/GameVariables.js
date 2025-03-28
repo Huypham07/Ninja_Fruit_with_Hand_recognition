@@ -25,17 +25,11 @@ var Game = {
 
 var isUsingCamera = false;
 var isDragging = false;
+var mediaHandTracking = null;
+var isHandTrackingEnabled = false;
 
-
-var gameWidth = 1080;
-var gameHeight = 600;
-
-function updateGameSize() {
-  gameWidth = Math.min(window.innerWidth * 0.9, 1080);
-    gameHeight = Math.min(window.innerHeight * 0.9, 600);
-}
-window.addEventListener("resize", updateGameSize);
-window.addEventListener("load", updateGameSize);
+var gameWidth = window.innerWidth;
+var gameHeight = window.innerHeight;
 
 var topCanvas;
 var topContext;
@@ -76,7 +70,7 @@ var ui_startFruit;
 var ui_scoreIcon;
 var ui_gameLife;
 var ui_gamelifeTexture;
-var ui_gameover;
+var ui_gameOver;
 
 //--collideTest
 var collide;

@@ -53,37 +53,44 @@ function init() {
   ui_gamelifeTexture = assetsManager["gamelife-3"];
   gameLevel = 0.1;
 
+  // Initialize MediaPipe hand tracking variable
+  mediaHandTracking = null;
+
   // Use hand tracking or mouse to control
-
   topCanvas.addEventListener("mousedown", (e) => {
-  isDragging = true;
-  updateMousePosition(e);
-});
+    if (!isHandTrackingEnabled) {
+      isDragging = true;
+      updateMousePosition(e);
+    }
+  });
 
-topCanvas.addEventListener("mousemove", (e) => {
-  if (isDragging) updateMousePosition(e);
-});
+  topCanvas.addEventListener("mousemove", (e) => {
+    if (!isHandTrackingEnabled && isDragging) updateMousePosition(e);
+  });
 
-topCanvas.addEventListener("mouseup", () => {
-  isDragging = false;
-});
+  topCanvas.addEventListener("mouseup", () => {
+    if (!isHandTrackingEnabled) {
+      isDragging = false;
+    }
+  });
 
-// Sự kiện cảm ứng (Mobile)
-topCanvas.addEventListener("touchstart", (e) => {
-  isDragging = true;
-  updateMousePosition(e.touches[0]); // Lấy vị trí ngón tay đầu tiên
-});
+  // Sự kiện cảm ứng (Mobile)
+  topCanvas.addEventListener("touchstart", (e) => {
+    if (!isHandTrackingEnabled) {
+      isDragging = true;
+      updateMousePosition(e.touches[0]); // Lấy vị trí ngón tay đầu tiên
+    }
+  });
 
-topCanvas.addEventListener("touchmove", (e) => {
-  if (isDragging) updateMousePosition(e.touches[0]);
-});
+  topCanvas.addEventListener("touchmove", (e) => {
+    if (!isHandTrackingEnabled && isDragging) updateMousePosition(e.touches[0]);
+  });
 
-topCanvas.addEventListener("touchend", () => {
-  isDragging = false;
-});
-  //   handtracking = new HandTracking(topCanvas.width, topCanvas.height);
-  //   handtracking.tracker.params.simple = true;
-  //   handtracking.addEventListener("handmove", handmove);
+  topCanvas.addEventListener("touchend", () => {
+    if (!isHandTrackingEnabled) {
+      isDragging = false;
+    }
+  });
 
   render();
   enterGame();
@@ -165,9 +172,9 @@ function updateMousePosition(e) {
 
 //hand tracking event
 function handmove(e) {
-  console.log(e);
   buildBladeParticle(e.x, e.y);
 }
+
 //render canvas
 function render() {
   requestAnimationFrame(render);
@@ -175,7 +182,11 @@ function render() {
   topContext.clearRect(0, 0, gameWidth, gameHeight);
   middleContext.clearRect(0, 0, gameWidth, gameHeight);
   bottomContext.clearRect(0, 0, gameWidth, gameHeight);
-  //   handtracking.tick();
+
+  // Update MediaPipe hand tracking if enabled
+  if (isHandTrackingEnabled && mediaHandTracking) {
+    mediaHandTracking.tick();
+  }
 
   // Render camera background nếu đang sử dụng
   renderCameraBackground();

@@ -25,16 +25,18 @@
         display: none;
         position: absolute;
         z-index: 0;
-        width: 90vw;
-        height: 90vh;
-        max-width: 1080px;
-        max-height: 600px;
+        width: 100vw;
+        height: 100vh;
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
       }
       #camera-feed {
         object-fit: cover;
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
       }
     </style>
   </head>
@@ -44,20 +46,10 @@
     <canvas class="canvas" id="middle" style="display: none">Your borwser does not suport html5 canvans!</canvas>
     <canvas class="canvas" id="top" style="display: none">Your borwser does not suport html5 canvans!</canvas>
     <canvas id="canvas" style="border: 1px solid black; display: none" style="display: none"></canvas>
-
-    <script>
-      function resizeCanvas() {
-        document.querySelectorAll(".canvas").forEach((canvas) => {
-          canvas.style.width = Math.min(window.innerWidth * 0.9, 1080) + "px";
-          canvas.style.height = Math.min(window.innerHeight * 0.9, 600) + "px";
-        });
-      }
-      window.addEventListener("resize", resizeCanvas);
-      window.addEventListener("load", resizeCanvas);
-    </script>
+    <video id="depth" style="display: none"></video>
+    <video id="camera-feed" playsinline style="display: none"></video>
 
     <!-- libs -->
-    <!-- <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script> -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/easing/EasePack.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/TweenLite.min.js"></script>
     <script
@@ -66,6 +58,20 @@
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/SoundJS/1.0.2/soundjs.min.js"></script>
     <script type="text/javascript" src="libs/spp.min.js"></script>
     <script type="text/javascript" src="libs/utils.js"></script>
+
+    <!-- MediaPipe dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+      crossorigin="anonymous"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+      crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <!-- hand tracking -->
+    <script type="text/javascript" src="src/HandConnections.js"></script>
+    <script type="text/javascript" src="src/MediaPipeHandTracking.js"></script>
 
     <!-- logic game -->
     <script type="text/javascript" src="src/GameVariables.js"></script>
@@ -78,6 +84,7 @@
     <script type="text/javascript" src="src/Module_blade.js"></script>
     <script type="text/javascript" src="src/Module_ui.js"></script>
     <script type="text/javascript" src="src/Module_camera.js"></script>
+    <!-- <script type="text/javascript" src="src/HandTracking.js"></script> -->
     <script type="text/javascript" src="src/Game.js"></script>
   </body>
 </html>
