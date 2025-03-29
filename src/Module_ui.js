@@ -47,17 +47,17 @@
       return;
     }
 
-    bottomContext.font = "36px Courier-Bold";
-    bottomContext.lineWidth = 4;
-    bottomContext.strokeStyle = "rgba(0, 0, 0, 0.7)";
+    middleContext.font = "36px Courier-Bold";
+    middleContext.lineWidth = 4;
+    middleContext.strokeStyle = "rgba(0, 0, 0, 0.7)";
 
-    bottomContext.font = "36px Courier-Bold";
-    bottomContext.strokeText(" " + score, 50, 10);
-    bottomContext.fillText(" " + score, 50, 10);
+    middleContext.font = "36px Courier-Bold";
+    middleContext.strokeText(" " + score, 50, 10);
+    middleContext.fillText(" " + score, 50, 10);
 
-    bottomContext.font = "14px Courier-Bold";
-    bottomContext.strokeText("Best:" + storage.highScore, 10, 55);
-    bottomContext.fillText("Best:" + storage.highScore, 10, 55);
+    middleContext.font = "14px Courier-Bold";
+    middleContext.strokeText("Best:" + storage.highScore, 10, 55);
+    middleContext.fillText("Best:" + storage.highScore, 10, 55);
   };
 
   showScoreUI = function () {
@@ -68,7 +68,7 @@
     ui_gameLife = particleSystem.createParticle(SPP.SpriteImage);
     ui_gameLife.regX = 1;
     ui_gameLife.regY = 0;
-    ui_gameLife.init(gameWidth, 8, Infinity, ui_gamelifeTexture, middleContext);
+    ui_gameLife.init(gameWidth - 60, 8, Infinity, ui_gamelifeTexture, middleContext);
   };
 
   hideScoreUI = function () {
@@ -77,25 +77,6 @@
     }
     if (ui_gameLife != undefined) {
       ui_gameLife.life = 0;
-    }
-  };
-
-  // Functions for controlling hand tracking
-  toggleHandTracking = function (enable) {
-    isHandTrackingEnabled = enable;
-
-    if (isHandTrackingEnabled) {
-      // Initialize MediaPipe hand tracking
-      if (!mediaHandTracking) {
-        mediaHandTracking = new MediaPipeHandTracking(topCanvas.width, topCanvas.height);
-        mediaHandTracking.addEventListener("handmove", handmove);
-      }
-
-      // Update button text
-      handTrackingButton.textContent = "Use Mouse";
-      isDragging = false; // Disable mouse dragging
-    } else {
-      handTrackingButton.textContent = "Use Hand Tracking";
     }
   };
 

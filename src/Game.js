@@ -23,15 +23,18 @@ function init() {
   middleCanvas.width = gameWidth;
   middleCanvas.height = gameHeight;
   middleContext = middleCanvas.getContext("2d");
+  middleContext.fillStyle = "#f6c223";
+  middleContext.textAlign = "left";
+  middleContext.textBaseline = "top";
 
   bottomCanvas = document.getElementById("bottom");
   bottomCanvas.style.display = "block";
   bottomCanvas.width = gameWidth;
   bottomCanvas.height = gameHeight;
   bottomContext = bottomCanvas.getContext("2d");
-  bottomContext.fillStyle = "#f6c223";
-  bottomContext.textAlign = "left";
-  bottomContext.textBaseline = "top";
+  // bottomContext.fillStyle = "#f6c223";
+  // bottomContext.textAlign = "left";
+  // bottomContext.textBaseline = "top";
 
   // Khởi tạo hệ thống camera
   initCamera();
@@ -159,6 +162,7 @@ function gameOver() {
   ui_gameLife.texture = ui_gamelifeTexture;
   if (score > parseInt(storage["highScore"])) storage.highScore = score;
   showGameoverUI();
+  window.game.isGameStarted = false;
 }
 function gameOverComplete() {
   replay();
@@ -178,6 +182,8 @@ function updateMousePosition(e) {
 
 //hand tracking event
 function handmove(e) {
+  mouse.x = e.x;
+  mouse.y = e.y;
   buildBladeParticle(e.x, e.y);
 }
 
@@ -185,17 +191,22 @@ function handmove(e) {
 function render() {
   requestAnimationFrame(render);
 
-  topContext.clearRect(0, 0, gameWidth, gameHeight);
-  middleContext.clearRect(0, 0, gameWidth, gameHeight);
   bottomContext.clearRect(0, 0, gameWidth, gameHeight);
+  renderCameraBackground();
+  
+  if (window.gameSettings.gamePaused) {
+    return;
+  }
+  
+  middleContext.clearRect(0, 0, gameWidth, gameHeight);
+  topContext.clearRect(0, 0, gameWidth, gameHeight);
+  
 
-  // Update MediaPipe hand tracking if enabled
   if (isHandTrackingEnabled && mediaHandTracking) {
-    mediaHandTracking.tick();
+    // mediaHandTracking.tick();
   }
 
   // Render camera background nếu đang sử dụng
-  renderCameraBackground();
 
   fruitSystem.render();
   bombSystem.render();

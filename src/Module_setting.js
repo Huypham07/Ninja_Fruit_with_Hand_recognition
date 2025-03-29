@@ -1,19 +1,21 @@
 /**
  * Module_setting - Handles game settings and their UI controls
  */
-const Module_setting = (function() {
+const Module_setting = (function () {
     // Private variables
     let settingsToggle;
     let settingsContent;
     let soundToggle;
     let cameraToggle;
+    let handTrackingToggle;
     let countdownElement;
     let overlayElement;
-    
+
     // Game settings state
     const gameSettings = {
         soundEnabled: true,
         cameraEnabled: false,
+        handTrackingEnabled: false,
         gamePaused: false
     };
 
@@ -33,11 +35,23 @@ const Module_setting = (function() {
         document.body.appendChild(overlayElement);
     }
 
+    let countdownInterval = null;
+
     function toggleSettings(show) {
         settingsContent.style.display = show ? 'block' : 'none';
         overlayElement.style.display = show ? 'block' : 'none';
-        
+
         if (show) {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+
+                const countdown = document.getElementById('countdown');
+                if (countdown) {
+                    countdown.style.display = 'none';
+                }
+            }
+
             gameSettings.gamePaused = true;
             pauseGame();
         } else {
@@ -57,19 +71,19 @@ const Module_setting = (function() {
 
     function toggleSound(enabled) {
         gameSettings.soundEnabled = enabled;
-        
+
         // Interact with SoundJS implementation
         if (window.createjs && createjs.Sound) {
             createjs.Sound.muted = !enabled;
         }
         console.log('Sound ' + (enabled ? 'enabled' : 'disabled'));
     }
-    
+
     function toggleCamera(enabled) {
         gameSettings.cameraEnabled = enabled;
-        
+
         console.log('Camera ' + (enabled ? 'enabled' : 'disabled'));
-        
+
         // Call the toggleCameraBackground function from Module_camera.js
         if (typeof toggleCameraBackground === 'function') {
             // This calls the function from Module_camera.js
@@ -77,12 +91,65 @@ const Module_setting = (function() {
         } else {
             console.error('Camera module function not found');
         }
+
+        // Update handtracking button state based on camera state
+        updateHandTrackingButtonState(enabled);
+
+        // If camera is disabled, also disable hand tracking
+        if (!enabled && gameSettings.handTrackingEnabled) {
+            handTrackingToggle.checked = false;
+            toggleHandTracking(false);
+        }
     }
-    
+
+    function toggleHandTracking(enabled) {
+        // Only allow enabling hand tracking if camera is enabled
+        if (enabled && !gameSettings.cameraEnabled) {
+            console.warn('Cannot enable hand tracking without camera');
+            handTrackingToggle.checked = false;
+            return;
+        }
+
+        gameSettings.handTrackingEnabled = enabled;
+        console.log('Hand tracking ' + (enabled ? 'enabled' : 'disabled'));
+
+        // Call the function to toggle hand tracking in the MediaPipe module
+        if (typeof toggleHandTrackingMediaPipe === 'function') {
+            toggleHandTrackingMediaPipe(enabled);
+        } else {
+            console.error('Hand tracking function not found: toggleHandTrackingMediaPipe');
+        }
+    }
+
+    function updateHandTrackingButtonState(cameraEnabled) {
+        // Enable or disable the hand tracking toggle based on camera state
+        if (handTrackingToggle) {
+            if (cameraEnabled) {
+                handTrackingToggle.disabled = false;
+                handTrackingToggle.parentElement.parentElement.classList.remove('disabled');
+                // Remove blur effect from label text
+                const handTrackingLabel = handTrackingToggle.parentElement.querySelector('label');
+                if (handTrackingLabel) {
+                    handTrackingLabel.style.opacity = '1';
+                    handTrackingLabel.style.filter = 'none';
+                }
+            } else {
+                handTrackingToggle.disabled = true;
+                handTrackingToggle.parentElement.parentElement.classList.add('disabled');
+                // Add blur effect to label text
+                const handTrackingLabel = handTrackingToggle.parentElement.querySelector('label');
+                if (handTrackingLabel) {
+                    handTrackingLabel.style.opacity = '0.5';
+                    handTrackingLabel.style.filter = 'blur(0.5px)';
+                }
+            }
+        }
+    }
+
     // Animation frame ID for pause functionality
     let originalRequestAnimationFrame;
     let originalGameLoop;
-    
+
     // Create or get countdown element
     function getCountdownElement() {
         if (!countdownElement) {
@@ -106,29 +173,37 @@ const Module_setting = (function() {
         }
         return countdownElement;
     }
-    
+
     // Show countdown before resuming the game
     function showCountdown(callback) {
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
+
         const countdown = document.getElementById('countdown');
         if (!countdown) {
             console.error('Countdown element not found');
+            if (callback) callback();
             return;
         }
-    
+
         countdown.style.display = 'block';
         let count = 3;
         countdown.textContent = count;
 
-        const interval = setInterval(() => {
+        countdownInterval = setInterval(() => {
             count--;
-            if (count > 0) {
-                countdown.textContent = count;
+            if (count >= 0) {
+                countdown.textContent = count > 0 ? count : 'GO!';
+                countdown.style.fontSize = count > 0 ? '120px' : '150px';
                 // Play sound for each number if sound is enabled
                 if (gameSettings.soundEnabled && window.createjs && createjs.Sound) {
                     createjs.Sound.play('countdown');
                 }
             } else {
-                clearInterval(interval);
+                clearInterval(countdownInterval);
+                countdownInterval = null;
                 countdown.style.display = 'none';
                 if (gameSettings.soundEnabled && window.createjs && createjs.Sound) {
                     createjs.Sound.play('start');
@@ -137,11 +212,11 @@ const Module_setting = (function() {
             }
         }, 1000);
     }
-    
+
     function togglePause(paused) {
         gameSettings.gamePaused = paused;
         console.log('Game ' + (paused ? 'paused' : 'resumed'));
-        
+
         if (paused) {
             // Immediately pause the game
             pauseGame();
@@ -152,118 +227,121 @@ const Module_setting = (function() {
             });
         }
     }
-    
+
     function pauseGame() {
-        // Method 1: Use game object if available
-        if (window.game && typeof window.game.pause === 'function') {
-            window.game.pause();
-            return; // Successfully handled by game object
-        }
-        
         // Method 2: Override requestAnimationFrame for a universal pause solution
-        if (!originalRequestAnimationFrame) {
-            // Save the original function on first pause
-            originalRequestAnimationFrame = window.requestAnimationFrame;
-            
-            // Override requestAnimationFrame to stop all animations
-            window.requestAnimationFrame = function(callback) {
-                originalGameLoop = callback;
-                return 0; // Return a dummy ID
-            };
-            
-            // Dispatch a custom event for other modules
+        // if (!originalRequestAnimationFrame) {
+        //     // Save the original function on first pause
+        //     originalRequestAnimationFrame = window.requestAnimationFrame;
+
+        //     // Override requestAnimationFrame to stop all animations
+        //     window.requestAnimationFrame = function (callback) {
+        //         originalGameLoop = callback;
+        //         return 0; // Return a dummy ID
+        //     };
+
+        //     // Dispatch a custom event for other modules
+        //     document.dispatchEvent(new CustomEvent('gamePaused'));
+        //     console.log('Animation loop paused');
+        // }
+        if (window.game) {
+            window.game.isPaused = true;
             document.dispatchEvent(new CustomEvent('gamePaused'));
-            console.log('Animation loop paused');
+            console.log('Top and middle canvas animations paused');
         }
     }
-    
+
     function resumeGame() {
-        // Method 1: Use game object if available
-        if (window.game && typeof window.game.resume === 'function') {
-            window.game.resume();
-            return; // Successfully handled by game object
-        }
-        
         // Method 2: Restore original requestAnimationFrame
-        if (originalRequestAnimationFrame) {
-            // Restore the original function
-            window.requestAnimationFrame = originalRequestAnimationFrame;
-            originalRequestAnimationFrame = null;
-            
-            // Resume the game loop if we have it
-            if (originalGameLoop) {
-                window.requestAnimationFrame(originalGameLoop);
-                console.log('Animation loop resumed');
-            }
-            
-            // Dispatch a custom event for other modules
+        // if (originalRequestAnimationFrame) {
+        //     // Restore the original function
+        //     window.requestAnimationFrame = originalRequestAnimationFrame;
+        //     originalRequestAnimationFrame = null;
+
+        //     // Resume the game loop if we have it
+        //     if (originalGameLoop) {
+        //         window.requestAnimationFrame(originalGameLoop);
+        //         console.log('Animation loop resumed');
+        //     }
+
+        //     // Dispatch a custom event for other modules
+        //     document.dispatchEvent(new CustomEvent('gameResumed'));
+        // }
+        if (window.game) {
+            window.game.isPaused = false;
             document.dispatchEvent(new CustomEvent('gameResumed'));
+            console.log('Top and middle canvas animations paused');
         }
     }
 
     // Public interface
     return {
-        init: function() {
+        init: function () {
             // Get DOM elements
             settingsToggle = document.getElementById('settings-toggle');
             settingsContent = document.getElementById('settings-content');
             soundToggle = document.getElementById('sound-toggle');
             cameraToggle = document.getElementById('camera-toggle');
-            
-            
+            handTrackingToggle = document.getElementById('hand-tracking-toggle');
+
             // Create overlay and countdown elements
             createOverlay();
             getCountdownElement();
-            
+
             // Set up event handlers
-            settingsToggle.addEventListener('click', function() {
+            settingsToggle.addEventListener('click', function () {
                 const isShowing = settingsContent.style.display === 'block';
                 toggleSettings(!isShowing);
             });
-            
-            soundToggle.addEventListener('change', function() {
+
+            soundToggle.addEventListener('change', function () {
                 toggleSound(this.checked);
             });
-            
-            cameraToggle.addEventListener('change', function() {
+
+            cameraToggle.addEventListener('change', function () {
                 toggleCamera(this.checked);
             });
 
-            // Initialize camera if Module_camera.js is loaded
-            if (typeof initCamera === 'function') {
-                initCamera();
-                cameraToggle.checked = false;  // Ensure toggle switch is off
-                toggleCamera(false);  // Ensure camera starts disabled
-            }
+            handTrackingToggle.addEventListener('change', function () {
+                toggleHandTracking(this.checked);
+            });
+
+            // Initial state setup
+            updateHandTrackingButtonState(gameSettings.cameraEnabled);
 
             // Expose settings to global scope for other modules
             window.gameSettings = gameSettings;
-            
+
             console.log('Settings module initialized');
         },
 
         // Update public methods
-        setSoundEnabled: function(enabled) {
+        setSoundEnabled: function (enabled) {
             soundToggle.checked = enabled;
             toggleSound(enabled);
         },
-        
-        setCameraEnabled: function(enabled) {
+
+        setCameraEnabled: function (enabled) {
             cameraToggle.checked = enabled;
             toggleCamera(enabled);
         },
-        
-        getSettings: function() {
-            return {...gameSettings};
+
+        setHandTrackingEnabled: function (enabled) {
+            handTrackingToggle.checked = enabled && gameSettings.cameraEnabled;
+            toggleHandTracking(handTrackingToggle.checked);
         },
-        
-        isPaused: function() {
+
+        getSettings: function () {
+            return { ...gameSettings };
+        },
+
+        isPaused: function () {
             return gameSettings.gamePaused;
         }
     };
 })();
 
 // Initialize when document is ready
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     Module_setting.init();
 });
