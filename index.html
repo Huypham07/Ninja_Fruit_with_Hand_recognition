@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ninja Fruit Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@400..900&display=swap" rel="stylesheet" />
+
     <style>
       body,
       html {
@@ -33,10 +37,214 @@
       }
       #camera-feed {
         object-fit: cover;
+      }
+      #settings-panel {
         position: absolute;
-        width: 1px;
-        height: 1px;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+      }
+
+      #settings-toggle {
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+        cursor: pointer;
+        outline: none;
+        transition: transform 0.3s;
+      }
+
+      #settings-toggle:hover {
+        transform: rotate(90deg);
+      }
+
+      #settings-content {
+        display: none;
+        background-image: url(assets/setting_background.png);
+        background-size: contain;
+        background-position: center;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 10px;
+        width: 200px;
+        height: 173px;
+      }
+
+      .setting-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        color: white;
+        margin-top: 50px;
+        padding: 0 10px;
+        gap: 15px;
+      }
+
+      .setting-item:first-child {
+        margin-top: 50px; /* Add margin to first item */
+      }
+
+      .setting-item span {
+        font-family: "Tektur", sans-serif;
+        color: #8b4513;
+        font-weight: 700;
+        font-size: 18px;
+        white-space: nowrap;
+      }
+
+      /* Toggle Switch Styles */
+      .toggle {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+      }
+
+      .toggle input {
         opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+        border-radius: 24px;
+      }
+
+      .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+
+      input:checked + .toggle-slider {
+        background-color: #4caf50;
+      }
+
+      input:checked + .toggle-slider:before {
+        transform: translateX(26px);
+      }
+      #settings-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+      }
+
+      #settings-toggle {
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+        cursor: pointer;
+        outline: none;
+        transition: transform 0.3s;
+      }
+
+      #settings-toggle:hover {
+        transform: rotate(90deg);
+      }
+
+      #settings-content {
+        display: none;
+        background-image: url(assets/setting_background.png);
+        background-size: contain;
+        background-position: center;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 10px;
+        width: 200px;
+        height: 173px;
+      }
+
+      .setting-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        color: white;
+        margin-top: 50px;
+        padding: 0 10px;
+        gap: 15px;
+      }
+
+      .setting-item:first-child {
+        margin-top: 50px; /* Add margin to first item */
+      }
+
+      .setting-item span {
+        font-family: "Tektur", sans-serif;
+        color: #8b4513;
+        font-weight: 700;
+        font-size: 18px;
+        white-space: nowrap;
+      }
+
+      /* Toggle Switch Styles */
+      .toggle {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+      }
+
+      .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+        border-radius: 24px;
+      }
+
+      .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+
+      input:checked + .toggle-slider {
+        background-color: #4caf50;
+      }
+
+      input:checked + .toggle-slider:before {
+        transform: translateX(26px);
       }
     </style>
   </head>
@@ -46,8 +254,47 @@
     <canvas class="canvas" id="middle" style="display: none">Your borwser does not suport html5 canvans!</canvas>
     <canvas class="canvas" id="top" style="display: none">Your borwser does not suport html5 canvans!</canvas>
     <canvas id="canvas" style="border: 1px solid black; display: none" style="display: none"></canvas>
-    <video id="depth" style="display: none"></video>
-    <video id="camera-feed" playsinline style="display: none"></video>
+
+    <!-- Add settings panel -->
+    <div
+      id="countdown"
+      style="
+        display: none;
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 120px;
+        font-weight: bold;
+        color: #fff;
+        text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        font-family: 'Tektur', sans-serif;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 20px 40px;
+        border-radius: 20px;
+      "></div>
+
+    <div id="settings-panel">
+      <button id="settings-toggle" class="settings-btn">⚙️</button>
+      <div id="settings-content">
+        <div class="setting-item">
+          <span>Sound</span>
+          <label class="toggle">
+            <input type="checkbox" id="sound-toggle" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-item">
+          <span>Camera</span>
+          <label class="toggle">
+            <input type="checkbox" id="camera-toggle" />
+            <!-- Removed 'checked' attribute -->
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
 
     <!-- libs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/easing/EasePack.min.js"></script>
@@ -86,5 +333,6 @@
     <script type="text/javascript" src="src/Module_camera.js"></script>
     <!-- <script type="text/javascript" src="src/HandTracking.js"></script> -->
     <script type="text/javascript" src="src/Game.js"></script>
+    <script type="text/javascript" src="src/Module_setting.js"></script>
   </body>
 </html>

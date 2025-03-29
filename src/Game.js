@@ -1,5 +1,9 @@
 window.onload = loadAssets;
 
+window.game = {
+  isGameStarted: false
+};
+
 function loadAssets() {
   assetsManager = new AssetsManager();
   assetsManager.addEventListener("complete", init);
@@ -105,6 +109,7 @@ function resetGameData() {
   gameLife = 3;
   ui_gamelifeTexture = assetsManager["gamelife-3"];
   gameLevel = 0.1;
+  window.game.isGameStarted = false;
 }
 function startGame(e) {
   hideStartGameUI();
@@ -112,6 +117,7 @@ function startGame(e) {
   resetGameData();
   showScoreUI();
   gameState = GAME_PLAYING;
+  window.game.isGameStarted = true;
 }
 function renderTimer() {
   if (gameState != GAME_PLAYING) return;
