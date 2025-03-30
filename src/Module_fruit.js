@@ -1,5 +1,6 @@
 (function () {
   //jucie
+
   var juiceUpdate = function () {
     this.scale -= 0.013;
     if (this.scale < 0) {
@@ -105,6 +106,47 @@
   };
   //cut fruit
   cutFruit = function (target) {
+
+    if (target.textureObj === assetsManager.fruitsObj["freeze_fruit"]) {
+
+      isFrozen = true;
+      freezeTimer = freezeDuration;
+
+      fruitSystem.getParticles().forEach(fruit => {
+        // fruit.velocity.reset(100, 100);
+        fruit.freeze(); // Đặt trạng thái đóng băng cho quả
+      });
+
+    }
+    // if (target.textureObj === assetsManager.fruitsObj["freeze_fruit"]) {
+    //   // Store original velocities
+    //   fruitSystem.particles.forEach(fruit => {
+    //     if (fruit !== target) {
+    //       originalVelocities.set(fruit, {
+    //         x: fruit.velocity.x,
+    //         y: fruit.velocity.y
+    //       });
+    //       // Freeze the fruit
+    //       fruit.velocity.reset(0, 0);
+    //     }
+    //   });
+
+    //   // Start the freeze effect
+    //   isFrozen = true;
+    //   setTimeout(() => {
+    //     // Unfreeze after 5 seconds
+    //     isFrozen = false;
+    //     fruitSystem.particles.forEach(fruit => {
+    //       const originalVel = originalVelocities.get(fruit);
+    //       if (originalVel) {
+    //         fruit.velocity.reset(originalVel.x, originalVel.y);
+    //       }
+    //     });
+    //     originalVelocities.clear();
+    //   }, FREEZE_DURATION);
+    // }
+
+
     score++;
     target.removeEventListener("dead", missHandler);
 

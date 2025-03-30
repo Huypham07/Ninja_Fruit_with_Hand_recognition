@@ -1,12 +1,13 @@
 var Game = {
   assets: {
-    fruits: ["apple", "basaha", "peach", "sandia"],
+    fruits: ["apple", "basaha", "peach", "sandia", "freeze_fruit"],
 
     other: [
       { id: "gameover", src: "assets/gameover.png" },
       { id: "gametitle", src: "assets/gametitle.png" },
       { id: "shadow", src: "assets/shadow.png" },
       { id: "bomb", src: "assets/bomb.png" },
+      // { id: "freeze_fruit", src: "assets/freeze_fruit.png" },
       { id: "miss", src: "assets/miss.png" },
       { id: "star", src: "assets/star.png" },
       { id: "score", src: "assets/score.png" },
@@ -20,6 +21,7 @@ var Game = {
       { id: "bombExplode", src: "assets/sound/bomb-explode.ogg" },
       { id: "splatter", src: "assets/sound/splatter.ogg" },
     ],
+
   },
 };
 
@@ -32,7 +34,7 @@ var gameHeight = 600;
 
 function updateGameSize() {
   gameWidth = Math.min(window.innerWidth * 0.9, 1080);
-    gameHeight = Math.min(window.innerHeight * 0.9, 600);
+  gameHeight = Math.min(window.innerHeight * 0.9, 600);
 }
 window.addEventListener("resize", updateGameSize);
 window.addEventListener("load", updateGameSize);
@@ -80,3 +82,8 @@ var ui_gameover;
 
 //--collideTest
 var collide;
+
+var isFrozen = false;
+var freezeDuration = 5000;
+var freezeTimer = 0;
+

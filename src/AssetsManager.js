@@ -55,4 +55,6 @@ class AssetsManager extends SPP.EventDispatcher {
   getRandomFruit() {
     return this.fruitsArray[Math.floor(this.fruitsArray.length * Math.random())];
   }
+
+
 }
