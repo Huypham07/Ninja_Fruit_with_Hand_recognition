@@ -1,26 +1,30 @@
 /**
  * Module_setting - Handles game settings and their UI controls
  */
+
 const Module_setting = (function () {
     // Private variables
     let settingsToggle;
     let settingsContent;
     let soundToggle;
+    let backgroundToggle;
     let cameraToggle;
     let handTrackingToggle;
     let countdownElement;
     let overlayElement;
+    let backgroundModal;
+    let closeBgModal;
 
     // Game settings state
     const gameSettings = {
         soundEnabled: true,
         cameraEnabled: false,
         handTrackingEnabled: false,
-        gamePaused: false
+        gamePaused: false,
+        backgroundModalEnabled: false,
     };
 
     // Private methods
-
     function createOverlay() {
         overlayElement = document.createElement('div');
         overlayElement.id = 'settings-overlay';
@@ -55,6 +59,11 @@ const Module_setting = (function () {
             gameSettings.gamePaused = true;
             pauseGame();
         } else {
+            // Close background modal if it's open
+            if (backgroundModal && backgroundModal.style.display === 'block') {
+                backgroundModal.style.display = 'none';
+            }
+            
             // Only show countdown if game is in progress
             if (window.game && window.game.isGameStarted) {
                 showCountdown(() => {
@@ -229,21 +238,6 @@ const Module_setting = (function () {
     }
 
     function pauseGame() {
-        // Method 2: Override requestAnimationFrame for a universal pause solution
-        // if (!originalRequestAnimationFrame) {
-        //     // Save the original function on first pause
-        //     originalRequestAnimationFrame = window.requestAnimationFrame;
-
-        //     // Override requestAnimationFrame to stop all animations
-        //     window.requestAnimationFrame = function (callback) {
-        //         originalGameLoop = callback;
-        //         return 0; // Return a dummy ID
-        //     };
-
-        //     // Dispatch a custom event for other modules
-        //     document.dispatchEvent(new CustomEvent('gamePaused'));
-        //     console.log('Animation loop paused');
-        // }
         if (window.game) {
             window.game.isPaused = true;
             document.dispatchEvent(new CustomEvent('gamePaused'));
@@ -252,25 +246,42 @@ const Module_setting = (function () {
     }
 
     function resumeGame() {
-        // Method 2: Restore original requestAnimationFrame
-        // if (originalRequestAnimationFrame) {
-        //     // Restore the original function
-        //     window.requestAnimationFrame = originalRequestAnimationFrame;
-        //     originalRequestAnimationFrame = null;
-
-        //     // Resume the game loop if we have it
-        //     if (originalGameLoop) {
-        //         window.requestAnimationFrame(originalGameLoop);
-        //         console.log('Animation loop resumed');
-        //     }
-
-        //     // Dispatch a custom event for other modules
-        //     document.dispatchEvent(new CustomEvent('gameResumed'));
-        // }
         if (window.game) {
             window.game.isPaused = false;
             document.dispatchEvent(new CustomEvent('gameResumed'));
-            console.log('Top and middle canvas animations paused');
+            console.log('Top and middle canvas animations resumed');
+        }
+    }
+
+    function openBackgroundModal() {
+        backgroundModal.style.display = 'block';
+        backgroundModal.style.zIndex = '1001'; // Ensure it's above other elements
+    }
+    
+    function closeBackgroundModal() {
+        backgroundModal.style.display = 'none';
+    }    
+
+    function selectBackground(e) {
+        const selectedImg = e.target;
+        if (selectedImg && selectedImg.src) {
+            console.log('Changing background to:', selectedImg.src);
+            
+            // Change the bottom canvas background image
+            const bottomCanvas = document.getElementById('bottom');
+            if (bottomCanvas) {
+                bottomCanvas.style.backgroundImage = `url('${selectedImg.src}')`;
+            }
+            
+            // Also apply background to body for full coverage
+            document.body.style.backgroundImage = `url('${selectedImg.src}')`;
+            document.body.style.backgroundSize = 'contain';
+            document.body.style.backgroundPosition = 'center';
+            document.body.style.backgroundRepeat = 'repeat';
+            document.body.style.backgroundAttachment = 'fixed';
+            
+            // Don't close the modal when selecting background
+            console.log('Background changed successfully');
         }
     }
 
@@ -283,6 +294,9 @@ const Module_setting = (function () {
             soundToggle = document.getElementById('sound-toggle');
             cameraToggle = document.getElementById('camera-toggle');
             handTrackingToggle = document.getElementById('hand-tracking-toggle');
+            backgroundToggle = document.getElementById('background-toggle');
+            backgroundModal = document.getElementById('background-modal');
+            closeBgModal = document.getElementById('close-bg-modal');
 
             // Create overlay and countdown elements
             createOverlay();
@@ -293,17 +307,64 @@ const Module_setting = (function () {
                 const isShowing = settingsContent.style.display === 'block';
                 toggleSettings(!isShowing);
             });
-
+            
             soundToggle.addEventListener('change', function () {
                 toggleSound(this.checked);
             });
-
+            
             cameraToggle.addEventListener('change', function () {
                 toggleCamera(this.checked);
             });
-
+            
             handTrackingToggle.addEventListener('change', function () {
                 toggleHandTracking(this.checked);
+            });
+
+            // Background toggle handler
+            backgroundToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    console.log('Opening background modal');
+                    openBackgroundModal();
+                } else {
+                    console.log('Resetting background');
+                    closeBackgroundModal();
+                    
+                    // Reset to default background
+                    const bottomCanvas = document.getElementById('bottom');
+                    if (bottomCanvas) {
+                        bottomCanvas.style.backgroundImage = 'url(assets/bg.jpg)';
+                    }
+                    document.body.style.backgroundImage = '';
+                }
+            });
+
+            // Close modal button handler
+            closeBgModal.addEventListener('click', function () {
+                closeBackgroundModal();
+                // Always set toggle to false when closing
+                backgroundToggle.checked = false;
+                // Reset background if no background was selected
+                if (!document.body.style.backgroundImage) {
+                    const bottomCanvas = document.getElementById('bottom');
+                    if (bottomCanvas) {
+                        bottomCanvas.style.backgroundImage = 'url(assets/bg.jpg)';
+                    }
+                    document.body.style.backgroundImage = '';
+                }
+            });
+            
+            // Setup background selection click handlers
+            const bgOptions = document.querySelectorAll('.bg-option');
+            console.log('Found background options:', bgOptions.length);
+            
+            bgOptions.forEach(function (img) {
+                // Ensure the image has loaded correctly
+                if (img.complete && img.naturalHeight === 0) {
+                    console.warn('Background image failed to load:', img.src);
+                }
+                
+                // Add click event listener
+                img.addEventListener('click', selectBackground);
             });
 
             // Initial state setup
@@ -315,7 +376,7 @@ const Module_setting = (function () {
             console.log('Settings module initialized');
         },
 
-        // Update public methods
+        // Public methods
         setSoundEnabled: function (enabled) {
             soundToggle.checked = enabled;
             toggleSound(enabled);

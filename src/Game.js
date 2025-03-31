@@ -4,10 +4,14 @@ window.game = {
   isGameStarted: false
 };
 
+
+
 function loadAssets() {
   assetsManager = new AssetsManager();
   assetsManager.addEventListener("complete", init);
   assetsManager.start();
+  Module_score.init();
+
 }
 function init() {
   //canvas
@@ -163,6 +167,7 @@ function gameOver() {
   if (score > parseInt(storage["highScore"])) storage.highScore = score;
   showGameoverUI();
   window.game.isGameStarted = false;
+  Module_score.show(score);
 }
 function gameOverComplete() {
   replay();
