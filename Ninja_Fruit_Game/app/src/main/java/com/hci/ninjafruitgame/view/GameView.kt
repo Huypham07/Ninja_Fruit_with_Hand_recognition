@@ -1,0 +1,248 @@
+package com.hci.ninjafruitgame.view
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.*
+import android.util.AttributeSet
+import android.util.Log
+import android.view.Choreographer
+import android.view.View
+import com.hci.ninjafruitgame.model.Fruit
+import com.hci.ninjafruitgame.R
+import com.hci.ninjafruitgame.model.SlicedPiece
+import kotlin.random.Random
+
+class GameView @JvmOverloads constructor(
+    context: Context, attrs: AttributeSet? = null
+) : View(context, attrs), SliceEffectReceiver {
+
+    private val choreographer = Choreographer.getInstance()
+
+    private val backgroundBitmap: Bitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.bg)
+
+    private val fruits = mutableListOf<Fruit>()
+    private val particles = mutableListOf<Particle>()
+    private val fruitBitmaps = listOf(
+        BitmapFactory.decodeResource(resources, R.drawable.apple),
+        BitmapFactory.decodeResource(resources, R.drawable.basaha),
+        BitmapFactory.decodeResource(resources, R.drawable.peach),
+        BitmapFactory.decodeResource(resources, R.drawable.sandia),
+    )
+
+    private val fruitBitmapResIds = listOf(
+        R.drawable.apple,
+        R.drawable.basaha,
+        R.drawable.peach,
+        R.drawable.sandia,
+    )
+
+    private val fruitColorMap = mapOf(
+        R.drawable.apple to Color.GREEN,
+        R.drawable.basaha to Color.RED,
+        R.drawable.peach to Color.YELLOW,
+        R.drawable.sandia to Color.GREEN,
+    )
+
+    private val slicedPieces = mutableListOf<SlicedPiece>()
+    private val splashMarks = mutableListOf<SplashMark>()
+
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val gravity = 0.6f
+    private var spawnCounter = 0
+
+    private val gameLoop = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            update()
+            invalidate()
+            choreographer.postFrameCallback(this) // gọi lại khung tiếp theo
+        }
+    }
+
+
+    init {
+        choreographer.postFrameCallback(gameLoop)
+    }
+
+
+    private fun update() {
+        // Spawn fruit mỗi 1.2s
+        spawnCounter++
+        if (spawnCounter > 75) {
+            spawnFruit()
+            spawnCounter = 0
+        }
+
+        // Cập nhật quả
+        val iterator = fruits.iterator()
+        while (iterator.hasNext()) {
+            val fruit = iterator.next()
+            fruit.update(gravity)
+
+            if (fruit.position.y > height + 200) {
+                iterator.remove() // rơi xuống đáy
+            }
+        }
+
+        // Cập nhật particle
+        val pIter = particles.iterator()
+        while (pIter.hasNext()) {
+            val p = pIter.next()
+            p.update()
+            if (!p.isAlive()) pIter.remove()
+        }
+
+        // Cập nhật các mảnh đã cắt
+        val iter = slicedPieces.iterator()
+        while (iter.hasNext()) {
+            val piece = iter.next()
+            piece.update(gravity)
+            if (piece.position.y > height + 200) {
+                iter.remove()
+            }
+        }
+
+        splashMarks.removeAll { !it.isAlive() }
+    }
+
+    private fun spawnSingleFruit() {
+        val fruitResId = fruitBitmapResIds.random()
+        val bitmap = fruitBitmaps[fruitBitmapResIds.indexOf(fruitResId)]
+        val startX = Random.nextInt(100, maxOf(101, width - 200)).toFloat()
+        val screenMid = width / 2f
+
+        val xVelocity = when {
+            startX < screenMid - 100 -> Random.nextFloat() * 5f + 1f      // bay sang phải
+            startX > screenMid + 100 -> -Random.nextFloat() * 5f - 1f     // bay sang trái
+            else -> Random.nextFloat() * 2f - 1f                          // bay thẳng đứng (gần như 0)
+        }
+
+        val minHeight = height / 2f + bitmap.height / 2f
+        val maxHeight = height.toFloat() - bitmap.height / 2f
+
+        val gravityAdjusted = gravity // dùng đúng gravity đang dùng ở game
+        val targetHeight = Random.nextFloat() * (maxHeight - minHeight) + minHeight
+        val yVelocity = -kotlin.math.sqrt(2 * gravityAdjusted * targetHeight).toFloat() * 1.0f
+
+        val fruit = Fruit(
+            bitmap = bitmap,
+            bitmapResId = fruitResId,
+            position = PointF(startX, height.toFloat()),
+            velocity = PointF(xVelocity, yVelocity),
+            rotationSpeed = Random.nextFloat() * 8f - 4f
+        )
+
+        fruits.add(fruit)
+    }
+
+    private fun spawnFruit() {
+        if (width < 300 || height < 300) return
+
+        // random number of fruits
+        val numFruits = Random.nextInt(1, 4)
+        for (i in 0 until numFruits) {
+            spawnSingleFruit()
+        }
+    }
+
+
+
+    @SuppressLint("DrawAllocation")
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+
+        canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
+
+        splashMarks.forEach { it.draw(canvas, paint) }
+        fruits.forEach { it.draw(canvas) }
+        slicedPieces.forEach { it.draw(canvas) }
+        particles.forEach { it.draw(canvas, paint) }
+    }
+
+    override fun onSliceAt(x: Float, y: Float) {
+        sliceAt(x, y)
+    }
+
+    fun sliceAt(x: Float, y: Float) {
+        fruits.forEach { fruit ->
+            if (!fruit.isSliced) {
+                val centerX = fruit.position.x + fruit.bitmap.width / 2f
+                val centerY = fruit.position.y + fruit.bitmap.height / 2f
+                val dx = x - centerX
+                val dy = y - centerY
+                val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+
+                val hitRadius = fruit.bitmap.width * 0.6f
+                if (distance < hitRadius) {
+                    fruit.isSliced = true
+                    var fruitColor = fruitColorMap[fruit.bitmapResId] ?: Color.WHITE
+                    emitParticles(centerX, centerY, fruitColor)
+                    addSplashMark(centerX, centerY, fruit.bitmapResId)
+
+                    // lấy tên quả từ resource name
+                    val resName = resources.getResourceEntryName(fruit.bitmapResId)
+                    val leftResId = resources.getIdentifier("${resName}_l", "drawable", context.packageName)
+                    val rightResId = resources.getIdentifier("${resName}_r", "drawable", context.packageName)
+
+                    val leftBitmap = BitmapFactory.decodeResource(resources, leftResId)
+                    val rightBitmap = BitmapFactory.decodeResource(resources, rightResId)
+
+                    // tạo 2 mảnh rơi lệch
+                    val leftPiece = SlicedPiece(
+                        bitmap = leftBitmap,
+                        position = PointF(fruit.position.x, fruit.position.y),
+                        velocity = PointF(fruit.velocity.x - 3f, fruit.velocity.y * 1.2f),
+                        rotationSpeed = -5f
+                    )
+
+                    val rightPiece = SlicedPiece(
+                        bitmap = rightBitmap,
+                        position = PointF(fruit.position.x + 20f, fruit.position.y),
+                        velocity = PointF(fruit.velocity.x + 3f, fruit.velocity.y * 1.15f),
+                        rotationSpeed = 6f
+                    )
+
+                    if (leftPiece.velocity.y < 0) {
+                        leftPiece.velocity.y = 0f
+                    }
+                    if (rightPiece.velocity.y < 0) {
+                        rightPiece.velocity.y = 0f
+                    }
+
+
+                    slicedPieces.add(leftPiece)
+                    slicedPieces.add(rightPiece)
+                }
+            }
+        }
+    }
+
+    private fun addSplashMark(x: Float, y: Float, fruitResId: Int) {
+        val resName = resources.getResourceEntryName(fruitResId)
+        val splashResId = resources.getIdentifier("${resName}_s", "drawable", context.packageName)
+
+        if (splashResId != 0) {
+            val splashBitmap = BitmapFactory.decodeResource(resources, splashResId)
+            splashMarks.add(SplashMark(bitmap = splashBitmap, position = PointF(x, y)))
+        }
+    }
+
+    private fun emitParticles(x: Float, y: Float, fruitColor: Int) {
+        repeat(25) {
+            val velocity = PointF(Random.nextFloat() * 12f - 6f, Random.nextFloat() * -12f)
+            val radius = Random.nextFloat() * 8f + 4f
+            val shrink = Random.nextFloat() * 0.15f + 0.05f
+
+            particles.add(
+                Particle(
+                    position = PointF(x, y),
+                    velocity = velocity,
+                    radius = radius,
+                    color = fruitColor,
+                    shrinkRate = shrink
+                )
+            )
+        }
+    }
+
+}
