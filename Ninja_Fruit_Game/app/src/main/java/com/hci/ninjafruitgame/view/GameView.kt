@@ -18,7 +18,7 @@ class GameView @JvmOverloads constructor(
 
     private val choreographer = Choreographer.getInstance()
 
-    private val backgroundBitmap: Bitmap =
+    private var backgroundBitmap: Bitmap =
         BitmapFactory.decodeResource(resources, R.drawable.bg)
 
     private val fruits = mutableListOf<Fruit>()
@@ -44,6 +44,17 @@ class GameView @JvmOverloads constructor(
         R.drawable.sandia to Color.GREEN,
     )
 
+    private var isPaused = false
+    fun getIsPaused(): Boolean {
+        return isPaused
+    }
+
+    private var currentScore = 0
+    private val prefs = context.getSharedPreferences("game_prefs", Context.MODE_PRIVATE)
+    private var bestScore = prefs.getInt("best_score", 0)
+    private val scoreIcon = BitmapFactory.decodeResource(resources, R.drawable.score)
+
+    private val scorePops = mutableListOf<ScorePop>()
     private val slicedPieces = mutableListOf<SlicedPiece>()
     private val splashMarks = mutableListOf<SplashMark>()
 
@@ -66,6 +77,7 @@ class GameView @JvmOverloads constructor(
 
 
     private fun update() {
+        if (isPaused) return
         // Spawn fruit mỗi 1.2s
         spawnCounter++
         if (spawnCounter > 75) {
@@ -103,6 +115,8 @@ class GameView @JvmOverloads constructor(
         }
 
         splashMarks.removeAll { !it.isAlive() }
+        scorePops.forEach { it.update() }
+        scorePops.removeAll { !it.isAlive() }
     }
 
     private fun spawnSingleFruit() {
@@ -157,6 +171,9 @@ class GameView @JvmOverloads constructor(
         fruits.forEach { it.draw(canvas) }
         slicedPieces.forEach { it.draw(canvas) }
         particles.forEach { it.draw(canvas, paint) }
+        scorePops.forEach { it.draw(canvas, scorePopTextPaint) }
+
+        drawScore(canvas)
     }
 
     override fun onSliceAt(x: Float, y: Float) {
@@ -175,6 +192,20 @@ class GameView @JvmOverloads constructor(
                 val hitRadius = fruit.bitmap.width * 0.6f
                 if (distance < hitRadius) {
                     fruit.isSliced = true
+
+                    currentScore++
+                    scorePops.add(
+                        ScorePop(
+                            position = PointF(centerX + 30f, centerY), // gần điểm chém
+                            text = "+1"
+                        )
+                    )
+
+                    if (currentScore > bestScore) {
+                        bestScore = currentScore
+                        prefs.edit().putInt("best_score", bestScore).apply()
+                    }
+
                     var fruitColor = fruitColorMap[fruit.bitmapResId] ?: Color.WHITE
                     emitParticles(centerX, centerY, fruitColor)
                     addSplashMark(centerX, centerY, fruit.bitmapResId)
@@ -244,5 +275,78 @@ class GameView @JvmOverloads constructor(
             )
         }
     }
+
+    private val scoreTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(255, 215, 0) // vàng đậm
+        textSize = 64f
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.LEFT
+    }
+
+    private val scorePopTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(255, 215, 0) // vàng đậm
+        textSize = 64f
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.LEFT
+    }
+
+    private val scoreStrokePaint = Paint(scoreTextPaint).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+        color = Color.BLACK
+    }
+
+    private val bestTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(255, 215, 0) // vàng đậm
+        textSize = 48f
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.LEFT
+    }
+
+    private val bestStrokePaint = Paint(bestTextPaint).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        color = Color.BLACK
+    }
+
+    private fun drawScore(canvas: Canvas) {
+        val iconX = 40f
+        val iconY = 60f
+
+        // Vẽ icon điểm
+        canvas.drawBitmap(scoreIcon, iconX, iconY, null)
+
+        // Vị trí điểm hiện tại
+        val scoreX = iconX + scoreIcon.width + 20f
+        val scoreY = iconY + scoreIcon.height * 0.75f
+
+        // Vẽ điểm hiện tại với viền
+        canvas.drawText(currentScore.toString(), scoreX, scoreY, scoreStrokePaint)
+        canvas.drawText(currentScore.toString(), scoreX, scoreY, scoreTextPaint)
+
+        // Vị trí Best Score
+        val bestY = scoreY + 70f
+        canvas.drawText("Best: $bestScore", iconX, bestY, bestStrokePaint)
+        canvas.drawText("Best: $bestScore", iconX, bestY, bestTextPaint)
+    }
+
+    fun pauseGame() {
+        isPaused = true
+    }
+
+    fun resumeGame() {
+        isPaused = false
+    }
+
+    fun setBackground(resId: Int) {
+        backgroundBitmap = BitmapFactory.decodeResource(resources, resId)
+    }
+
+    private var pauseRequested: (() -> Unit)? = null
+
+    fun setOnPauseRequestedListener(listener: () -> Unit) {
+        pauseRequested = listener
+    }
+
 
 }

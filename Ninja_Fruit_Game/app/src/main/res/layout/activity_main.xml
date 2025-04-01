@@ -19,6 +19,29 @@
     <com.hci.ninjafruitgame.view.FruitSliceView
         android:id="@+id/view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="match_parent" />
+
+    <ImageView
+        android:id="@+id/btnPause"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@drawable/pause"
+        android:layout_gravity="top|end"
+        android:layout_margin="20dp"
+        android:visibility="visible"
         />
+
+    <com.hci.ninjafruitgame.view.PauseMenuView
+        android:id="@+id/pauseMenuContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"/>
+
+    <com.hci.ninjafruitgame.view.CountdownOverlay
+        android:id="@+id/countdownOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+
 </FrameLayout>

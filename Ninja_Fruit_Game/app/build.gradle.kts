@@ -53,6 +53,8 @@ dependencies {
     // Coroutine (nếu cần dùng async sau này)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
