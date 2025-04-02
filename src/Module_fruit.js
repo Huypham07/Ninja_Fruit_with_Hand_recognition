@@ -108,15 +108,23 @@
   cutFruit = function (target) {
 
     if (target.textureObj === assetsManager.fruitsObj["freeze_fruit"]) {
-
+      //target.freeze();
       isFrozen = true;
-      freezeTimer = freezeDuration;
-
+      //freezeTimer = freezeDuration;
       fruitSystem.getParticles().forEach(fruit => {
-        // fruit.velocity.reset(100, 100);
-        fruit.freeze(); // Đặt trạng thái đóng băng cho quả
-      });
-
+        if (fruit !== target) {
+          //console.log(fruit);
+          fruit.velocity.reset(0, 0);
+          fruit.damp.reset(1, 1);
+          fruit.removeForce("g");
+          fruit.removeForce('rotation');
+        }
+      })
+      bombSystem.getParticles().forEach(bomb => {
+        bomb.velocity.reset(0, 0);
+        bomb.damp.reset(1, 1);
+        bomb.removeForce("g");
+      })
     }
     // if (target.textureObj === assetsManager.fruitsObj["freeze_fruit"]) {
     //   // Store original velocities
@@ -161,7 +169,7 @@
     e.target.removeEventListener("dead", missHandler);
     if (gameState == GAME_OVER) return;
     missFruit(e.target);
-    gameLife--;
+    //gameLife--;
     if (gameLife == 0) gameOver();
     if (gameLife < 0) gameLife = 0;
     ui_gamelifeTexture = assetsManager["gamelife-" + gameLife];
