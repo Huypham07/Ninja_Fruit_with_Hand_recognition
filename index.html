@@ -4,39 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ninja Fruit Game</title>
-    <style>
-      body,
-      html {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        background-color: #000;
-        overflow: hidden;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      #bottom {
-        background-image: url(assets/bg.jpg);
-        background-size: cover;
-        background-position: center;
-      }
-      .canvas {
-        display: none;
-        position: absolute;
-        z-index: 0;
-        width: 90vw;
-        height: 90vh;
-        max-width: 1080px;
-        max-height: 600px;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-      }
-      #camera-feed {
-        object-fit: cover;
-      }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Tektur:wght@400..900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <canvas class="canvas" id="bottom" style="display: none">Your borwser does not suport html5 canvans!</canvas>
@@ -45,19 +16,89 @@
     <canvas class="canvas" id="top" style="display: none">Your borwser does not suport html5 canvans!</canvas>
     <canvas id="canvas" style="border: 1px solid black; display: none" style="display: none"></canvas>
 
-    <script>
-      function resizeCanvas() {
-        document.querySelectorAll(".canvas").forEach((canvas) => {
-          canvas.style.width = Math.min(window.innerWidth * 0.9, 1080) + "px";
-          canvas.style.height = Math.min(window.innerHeight * 0.9, 600) + "px";
-        });
-      }
-      window.addEventListener("resize", resizeCanvas);
-      window.addEventListener("load", resizeCanvas);
-    </script>
+    <video id="camera-feed" playsinline style="display: none"></video>
+
+    <!-- Add settings panel -->
+    <div
+      id="countdown"
+      style="
+        display: none;
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 120px;
+        font-weight: bold;
+        color: #fff;
+        text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        font-family: 'Tektur', sans-serif;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 20px 40px;
+        border-radius: 20px;
+      "></div>
+
+    <div id="settings-panel">
+      <button id="settings-toggle" class="settings-btn">⚙️</button>
+      <div id="settings-content">
+        <div class="setting-item">
+          <span>Sound</span>
+          <label class="toggle">
+            <input type="checkbox" id="sound-toggle" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-item">
+          <span>Background</span>
+          <label class="toggle">
+            <input type="checkbox" id="background-toggle" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="background-modal" style="display: none; position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 1001;">
+          <div class="background-select">
+              <h3>Select Background</h3>
+              <div class="background-options" style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center;">
+                  <img src="assets/bg1.png" class="bg-option" alt="Background 1">
+                  <img src="assets/bg2.png" class="bg-option" alt="Background 2">
+                  <img src="assets/bg3.png" class="bg-option" alt="Background 3">
+                  <img src="assets/bg4.png" class="bg-option" alt="Background 4">
+                  <img src="assets/bg5.png" class="bg-option" alt="Background 5">
+              </div>
+              <div style="text-align: center; margin-top: 15px;">
+                  <button id="close-bg-modal" class="close-button">Close</button>
+              </div>
+          </div>
+        </div>
+        <div class="setting-item">
+          <span>Camera</span>
+          <label class="toggle">
+            <input type="checkbox" id="camera-toggle" />
+            <!-- Removed 'checked' attribute -->
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-item disabled">
+          <span>Hand Track</span>
+          <label class="toggle">
+            <input type="checkbox" id="hand-tracking-toggle" disabled />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="score-overlay" class="overlay" style="display: none"></div>
+      </div>
+    </div>
+
+    <!-- <div id="score-board" class="score-board" style="display: none">
+      <p class="setting-text"><span id="final-score">0</span></p>
+      <p class="best-score">Best: <span id="best-score">0</span></p>
+      <div class="button-container">
+          <button id="home-btn" class="game-button">Home</button>
+          <button id="replay-btn" class="game-button">Replay</button>
+      </div>
+    </div> -->
 
     <!-- libs -->
-    <!-- <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script> -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/easing/EasePack.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/1.20.4/TweenLite.min.js"></script>
     <script
@@ -66,6 +107,19 @@
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/SoundJS/1.0.2/soundjs.min.js"></script>
     <script type="text/javascript" src="libs/spp.min.js"></script>
     <script type="text/javascript" src="libs/utils.js"></script>
+
+    <!-- MediaPipe dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+      crossorigin="anonymous"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+      crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <!-- hand tracking -->
+    <script type="text/javascript" src="src/MediaPipeHandTracking.js"></script>
 
     <!-- logic game -->
     <script type="text/javascript" src="src/GameVariables.js"></script>
@@ -79,5 +133,7 @@
     <script type="text/javascript" src="src/Module_ui.js"></script>
     <script type="text/javascript" src="src/Module_camera.js"></script>
     <script type="text/javascript" src="src/Game.js"></script>
+    <script type="text/javascript" src="src/Module_setting.js"></script>
+    <script type="text/javascript" src="src/Module_score.js"></script>
   </body>
 </html>
