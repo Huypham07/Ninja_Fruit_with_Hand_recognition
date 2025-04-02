@@ -10,6 +10,7 @@ import android.view.Choreographer
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import androidx.core.animation.doOnEnd
+import androidx.core.graphics.toColorInt
 import com.hci.ninjafruitgame.R
 import kotlin.random.Random
 
@@ -20,12 +21,21 @@ class StartScreenView @JvmOverloads constructor(
 
     private val choreographer = Choreographer.getInstance()
 
-    private val backgroundBitmap: Bitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.bg)
+    private var backgroundBitmap: Bitmap =
+        BitmapFactory.decodeResource(resources, R.drawable.bg1)
     private val titleBitmap = BitmapFactory.decodeResource(resources, R.drawable.gametitle)
     private val ringBitmap = BitmapFactory.decodeResource(resources, R.drawable.newgame)
     private val fruitBitmap = BitmapFactory.decodeResource(resources, R.drawable.peach)
     private val fruitColor = Color.YELLOW
+
+    private val ringSettingBitmap = BitmapFactory.decodeResource(resources, R.drawable.settings)
+    private val fruitSettingBitmap = BitmapFactory.decodeResource(resources, R.drawable.apple)
+    private val fruitSettingColor = Color.GREEN
+
+    private val ringQuitBitmap = BitmapFactory.decodeResource(resources, R.drawable.quit)
+    private val fruitQuitBitmap = BitmapFactory.decodeResource(resources, R.drawable.bomb)
+    private val fruitQuitColor = "#FBF1BC".toColorInt()
+
     private val particles = mutableListOf<Particle>()
     private val splashMarks = mutableListOf<SplashMark>()
 
@@ -42,13 +52,19 @@ class StartScreenView @JvmOverloads constructor(
     private var ringRotation = 0f
     private var fruitRotation = 0f
 
+    private val shiftX = 150f
+    private val shiftY = 100f
+
+    private val largeShiftY = 250f
+
     private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 800
         interpolator = DecelerateInterpolator()
         addUpdateListener {
             val value = it.animatedValue as Float
+            exitAlpha = 0.8f + value * 0.2f
             // Title đi lên
-            titleY = height - value * (height / 2f + titleBitmap.height)
+            titleY = height - value * height
             // Ring thu nhỏ dần
             ringScale = 2.5f - value * 1.5f
             invalidate()
@@ -87,12 +103,24 @@ class StartScreenView @JvmOverloads constructor(
         }
     }
 
+    fun show() {
+        visibility = VISIBLE
+        isExiting = false
+        animator.start()
+        Log.d("statt", "ajsd")
+    }
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             ringRotation += 2f
             fruitRotation -= 3f
-            particles.removeAll { !it.isAlive() }
+            val pIter = particles.iterator()
+            while (pIter.hasNext()) {
+                val p = pIter.next()
+                p.update()
+                if (!p.isAlive()) pIter.remove()
+            }
+            // remove all particles
             splashMarks.removeAll { !it.isAlive() }
             invalidate()
             choreographer.postFrameCallback(this)
@@ -107,70 +135,123 @@ class StartScreenView @JvmOverloads constructor(
     }
 
 
-
     @SuppressLint("DrawAllocation")
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
 
         val centerX = width / 2f
-        val centerY = height / 2f + 100f
-
-        val shiftX = 200f
+        val centerY = height / 2f
 
         paint.alpha = (255 * exitAlpha).toInt()
 
         // Vẽ tiêu đề (từ dưới lên)
-        canvas.drawBitmap(
-            titleBitmap,
-            centerX - titleBitmap.width / 2f,
-            titleY,
-            paint
-        )
+        canvas.drawBitmap(titleBitmap, centerX - titleBitmap.width / 2f, titleY, paint)
 
 
-        // Vẽ vòng xoay
-        canvas.save()
-        canvas.translate(centerX + shiftX, centerY)
-        canvas.rotate(ringRotation)
-        canvas.scale(ringScale, ringScale)
-        canvas.drawBitmap(
+        drawFruitWithRing(
+            canvas,
+            centerX + shiftX,
+            centerY + shiftY,
             ringBitmap,
-            -ringBitmap.width / 2f,
-            -ringBitmap.height / 2f,
-            paint
-        )
-        canvas.restore()
-
-        // Vẽ trái cây xoay ngược bên trong
-        canvas.save()
-        canvas.translate(centerX + shiftX, centerY)
-        canvas.rotate(fruitRotation)
-        canvas.scale(ringScale, ringScale)
-        canvas.drawBitmap(
             fruitBitmap,
-            -fruitBitmap.width / 2f,
-            -fruitBitmap.height / 2f,
-            paint
+            ringScale,
+            fruitRotation,
+            ringRotation
         )
-        canvas.restore()
+        drawFruitWithRing(
+            canvas,
+            centerX - shiftX - ringSettingBitmap.width / 2,
+            centerY + largeShiftY,
+            ringSettingBitmap,
+            fruitSettingBitmap,
+            ringScale * 0.8f,
+            fruitRotation * 0.8f,
+            ringRotation * 0.8f
+        )
+        drawFruitWithRing(
+            canvas,
+            centerX + shiftX + ringBitmap.width,
+            centerY + largeShiftY,
+            ringQuitBitmap,
+            fruitQuitBitmap,
+            ringScale * 0.8f,
+            fruitRotation * 0.8f,
+            ringRotation * 0.8f
+        )
+
 
         splashMarks.forEach { it.draw(canvas, paint) }
         particles.forEach { it.draw(canvas, paint) }
     }
 
+    private fun drawFruitWithRing(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        ring: Bitmap,
+        fruit: Bitmap,
+        scale: Float,
+        fruitRot: Float,
+        ringRot: Float
+    ) {
+        canvas.save()
+        canvas.translate(x, y)
+        canvas.rotate(ringRot)
+        canvas.scale(scale, scale)
+        canvas.drawBitmap(ring, -ring.width / 2f, -ring.height / 2f, paint)
+        canvas.restore()
+
+        canvas.save()
+        canvas.translate(x, y)
+        canvas.rotate(fruitRot)
+        canvas.scale(scale, scale)
+        canvas.drawBitmap(fruit, -fruit.width / 2f, -fruit.height / 2f, paint)
+        canvas.restore()
+    }
+
+
     override fun onSliceAt(x: Float, y: Float) {
-        if (isSlicedAt(x, y)) {
-            emitStartParticles(x, y)
-            addStartSplash(x, y)
-            playExitAnimation {
-                onStartGame?.invoke()
+        if (isExiting) return
+
+        when {
+            isSlicedAt(x, y, width / 2f + shiftX, height / 2f + shiftY, fruitBitmap) -> {
+                emitStartParticles(x, y, fruitColor)
+                addStartSplash(x, y, "peach")
+                playExitAnimation {
+                    onStartGame?.invoke()
+                }
+            }
+
+            isSlicedAt(
+                x,
+                y,
+                width / 2f - shiftX - ringSettingBitmap.width / 2,
+                height / 2f + largeShiftY,
+                fruitSettingBitmap
+            ) -> {
+                emitStartParticles(x, y, fruitSettingColor)
+                addStartSplash(x, y, "apple")
+                onOpenSettings?.invoke()
+
+            }
+
+            isSlicedAt(
+                x,
+                y,
+                width / 2f + shiftX + ringBitmap.width,
+                height / 2f + largeShiftY,
+                fruitQuitBitmap
+            ) -> {
+                emitStartParticles(x, y, fruitQuitColor)
+                addStartSplash(x, y, "bomb")
+                onQuit?.invoke()
             }
         }
     }
 
-    private fun addStartSplash(x: Float, y: Float) {
-        val splashResId = resources.getIdentifier("peach_s", "drawable", context.packageName)
+    private fun addStartSplash(x: Float, y: Float, name: String) {
+        val splashResId = resources.getIdentifier("${name}_s", "drawable", context.packageName)
 
         if (splashResId != 0) {
             val splashBitmap = BitmapFactory.decodeResource(resources, splashResId)
@@ -178,7 +259,7 @@ class StartScreenView @JvmOverloads constructor(
         }
     }
 
-    private fun emitStartParticles(x: Float, y: Float) {
+    private fun emitStartParticles(x: Float, y: Float, color: Int) {
         repeat(25) {
             val velocity = PointF(Random.nextFloat() * 12f - 6f, Random.nextFloat() * -12f)
             val radius = Random.nextFloat() * 8f + 4f
@@ -189,23 +270,27 @@ class StartScreenView @JvmOverloads constructor(
                     position = PointF(x, y),
                     velocity = velocity,
                     radius = radius,
-                    color = fruitColor,
+                    color = color,
                     shrinkRate = shrink
                 )
             )
         }
     }
 
-    fun isSlicedAt(x: Float, y: Float): Boolean {
-        val centerX = width / 2f + 200f
-        val centerY = height / 2f + 100f
-        val dx = x - centerX
-        val dy = y - centerY
+    fun isSlicedAt(x: Float, y: Float, posX: Float, posY: Float, fruit: Bitmap): Boolean {
+        val dx = x - posX
+        val dy = y - posY
         val distance = kotlin.math.sqrt(dx * dx + dy * dy)
 
-        val hitRadius = fruitBitmap.width * 0.6f
+        val hitRadius = fruit.width * 0.6f
         return distance < hitRadius
     }
 
+    fun setBackground(resId: Int) {
+        backgroundBitmap = BitmapFactory.decodeResource(resources, resId)
+    }
+
     var onStartGame: (() -> Unit)? = null
+    var onOpenSettings: (() -> Unit)? = null
+    var onQuit: (() -> Unit)? = null
 }

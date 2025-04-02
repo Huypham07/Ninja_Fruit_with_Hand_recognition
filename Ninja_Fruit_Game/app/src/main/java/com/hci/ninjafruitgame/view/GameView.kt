@@ -9,6 +9,8 @@ import android.view.Choreographer
 import android.view.View
 import com.hci.ninjafruitgame.model.Fruit
 import com.hci.ninjafruitgame.R
+import com.hci.ninjafruitgame.model.Bomb
+import com.hci.ninjafruitgame.model.GameObjectType
 import com.hci.ninjafruitgame.model.SlicedPiece
 import kotlin.random.Random
 
@@ -19,7 +21,7 @@ class GameView @JvmOverloads constructor(
     private val choreographer = Choreographer.getInstance()
 
     private var backgroundBitmap: Bitmap =
-        BitmapFactory.decodeResource(resources, R.drawable.bg)
+        BitmapFactory.decodeResource(resources, R.drawable.bg1)
 
     private val fruits = mutableListOf<Fruit>()
     private val particles = mutableListOf<Particle>()
@@ -28,6 +30,8 @@ class GameView @JvmOverloads constructor(
         BitmapFactory.decodeResource(resources, R.drawable.basaha),
         BitmapFactory.decodeResource(resources, R.drawable.peach),
         BitmapFactory.decodeResource(resources, R.drawable.sandia),
+        BitmapFactory.decodeResource(resources, R.drawable.banana),
+        BitmapFactory.decodeResource(resources, R.drawable.orange)
     )
 
     private val fruitBitmapResIds = listOf(
@@ -35,6 +39,8 @@ class GameView @JvmOverloads constructor(
         R.drawable.basaha,
         R.drawable.peach,
         R.drawable.sandia,
+        R.drawable.banana,
+        R.drawable.orange
     )
 
     private val fruitColorMap = mapOf(
@@ -42,7 +48,12 @@ class GameView @JvmOverloads constructor(
         R.drawable.basaha to Color.RED,
         R.drawable.peach to Color.YELLOW,
         R.drawable.sandia to Color.GREEN,
+        R.drawable.banana to Color.YELLOW,
+        R.drawable.orange to Color.rgb(255, 165, 0) // Màu cam
     )
+
+    private val bombs = mutableListOf<Bomb>()
+    private val bombBitmap = BitmapFactory.decodeResource(resources, R.drawable.bomb)
 
     private var isPaused = false
     fun getIsPaused(): Boolean {
@@ -80,9 +91,14 @@ class GameView @JvmOverloads constructor(
         if (isPaused) return
         // Spawn fruit mỗi 1.2s
         spawnCounter++
-        if (spawnCounter > 75) {
-            spawnFruit()
-            spawnCounter = 0
+        if (spawnCounter >= 75) {
+            if (spawnCounter % 75 == 0) {
+                spawnFruit()
+            }
+            if (spawnCounter >= 300) {
+                spawnBomb()
+                spawnCounter = 0
+            }
         }
 
         // Cập nhật quả
@@ -93,6 +109,16 @@ class GameView @JvmOverloads constructor(
 
             if (fruit.position.y > height + 200) {
                 iterator.remove() // rơi xuống đáy
+            }
+        }
+
+        val bIter = bombs.iterator()
+        while (bIter.hasNext()) {
+            val bomb = bIter.next()
+            bomb.update(gravity)
+
+            if (bomb.position.y > height + 200) {
+                bIter.remove() // rơi xuống đáy
             }
         }
 
@@ -119,9 +145,13 @@ class GameView @JvmOverloads constructor(
         scorePops.removeAll { !it.isAlive() }
     }
 
-    private fun spawnSingleFruit() {
-        val fruitResId = fruitBitmapResIds.random()
-        val bitmap = fruitBitmaps[fruitBitmapResIds.indexOf(fruitResId)]
+    private fun spawnSingle(type: Int) {
+        var bitmap = fruitBitmaps.random()
+        val fruitResId = fruitBitmapResIds[fruitBitmaps.indexOf(bitmap)]
+        if (type == GameObjectType.TYPE_BOMB.value) {
+            bitmap = bombBitmap
+        }
+
         val startX = Random.nextInt(100, maxOf(101, width - 200)).toFloat()
         val screenMid = width / 2f
 
@@ -136,17 +166,30 @@ class GameView @JvmOverloads constructor(
 
         val gravityAdjusted = gravity // dùng đúng gravity đang dùng ở game
         val targetHeight = Random.nextFloat() * (maxHeight - minHeight) + minHeight
-        val yVelocity = -kotlin.math.sqrt(2 * gravityAdjusted * targetHeight).toFloat() * 1.0f
+        val yVelocity = -kotlin.math.sqrt(2 * gravityAdjusted * targetHeight) * 1.0f
 
-        val fruit = Fruit(
-            bitmap = bitmap,
-            bitmapResId = fruitResId,
-            position = PointF(startX, height.toFloat()),
-            velocity = PointF(xVelocity, yVelocity),
-            rotationSpeed = Random.nextFloat() * 8f - 4f
-        )
+        if (type == GameObjectType.TYPE_FRUIT.value) {
+            val fruit = Fruit(
+                bitmap = bitmap,
+                bitmapResId = fruitResId,
+                position = PointF(startX, height.toFloat()),
+                velocity = PointF(xVelocity, yVelocity),
+                rotationSpeed = Random.nextFloat() * 8f - 4f
+            )
 
-        fruits.add(fruit)
+            fruits.add(fruit)
+            Log.d("test", "spawn fruit")
+        } else if (type == GameObjectType.TYPE_BOMB.value) {
+            val bomb = Bomb(
+                bitmap = bitmap, position = PointF(startX, height.toFloat()),
+                velocity = PointF(xVelocity, yVelocity),
+                rotationSpeed = Random.nextFloat() * 8f - 4f
+            )
+
+            bombs.add(bomb)
+            Log.d("test", "spawn bomb")
+
+        }
     }
 
     private fun spawnFruit() {
@@ -155,11 +198,18 @@ class GameView @JvmOverloads constructor(
         // random number of fruits
         val numFruits = Random.nextInt(1, 4)
         for (i in 0 until numFruits) {
-            spawnSingleFruit()
+            spawnSingle(GameObjectType.TYPE_FRUIT.value)
         }
     }
 
+    private fun spawnBomb() {
+        if (width < 300 || height < 300) return
 
+        val numBombs = Random.nextInt(1, 2)
+        for (i in 0 until numBombs) {
+            spawnSingle(GameObjectType.TYPE_BOMB.value)
+        }
+    }
 
     @SuppressLint("DrawAllocation")
     override fun onDraw(canvas: Canvas) {
@@ -169,6 +219,7 @@ class GameView @JvmOverloads constructor(
 
         splashMarks.forEach { it.draw(canvas, paint) }
         fruits.forEach { it.draw(canvas) }
+        bombs.forEach { it.draw(canvas) }
         slicedPieces.forEach { it.draw(canvas) }
         particles.forEach { it.draw(canvas, paint) }
         scorePops.forEach { it.draw(canvas, scorePopTextPaint) }
@@ -212,8 +263,10 @@ class GameView @JvmOverloads constructor(
 
                     // lấy tên quả từ resource name
                     val resName = resources.getResourceEntryName(fruit.bitmapResId)
-                    val leftResId = resources.getIdentifier("${resName}_l", "drawable", context.packageName)
-                    val rightResId = resources.getIdentifier("${resName}_r", "drawable", context.packageName)
+                    val leftResId =
+                        resources.getIdentifier("${resName}_l", "drawable", context.packageName)
+                    val rightResId =
+                        resources.getIdentifier("${resName}_r", "drawable", context.packageName)
 
                     val leftBitmap = BitmapFactory.decodeResource(resources, leftResId)
                     val rightBitmap = BitmapFactory.decodeResource(resources, rightResId)
@@ -338,6 +391,27 @@ class GameView @JvmOverloads constructor(
         isPaused = false
     }
 
+    fun resetGame() {
+        // Reset tất cả danh sách
+        fruits.clear()
+        slicedPieces.clear()
+        particles.clear()
+        splashMarks.clear()
+        scorePops.clear()
+
+        // Reset điểm
+        currentScore = 0
+
+        // Reset trạng thái
+        isPaused = false
+        spawnCounter = 0
+
+        // Reset background nếu cần (giữ nguyên hoặc về mặc định)
+        // backgroundBitmap = BitmapFactory.decodeResource(resources, R.drawable.bg)
+        invalidate()
+    }
+
+
     fun setBackground(resId: Int) {
         backgroundBitmap = BitmapFactory.decodeResource(resources, resId)
     }
@@ -347,6 +421,4 @@ class GameView @JvmOverloads constructor(
     fun setOnPauseRequestedListener(listener: () -> Unit) {
         pauseRequested = listener
     }
-
-
 }
