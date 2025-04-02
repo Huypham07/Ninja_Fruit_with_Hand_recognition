@@ -2,16 +2,18 @@ package com.hci.ninjafruitgame.view
 
 import android.content.Context
 import android.graphics.*
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import androidx.annotation.Nullable
 import java.util.ArrayDeque
 import java.util.Deque
+import androidx.core.graphics.toColorInt
 
 class FruitSliceView @JvmOverloads constructor(
     context: Context,
-    @Nullable attrs: AttributeSet? = null,
+    attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
@@ -58,9 +60,9 @@ class FruitSliceView @JvmOverloads constructor(
         mShader = LinearGradient(
             0f, 0f, 40f, 60f,
             intArrayOf(
-                Color.parseColor("#f8f8f8"),
-                Color.parseColor("#C0C0C0"),
-                Color.parseColor("#f8f8f8")
+                "#f8f8f8".toColorInt(),
+                "#C0C0C0".toColorInt(),
+                "#f8f8f8".toColorInt()
             ),
             null,
             Shader.TileMode.CLAMP
@@ -174,4 +176,17 @@ class FruitSliceView @JvmOverloads constructor(
         path.close()
         return path
     }
+
+    fun registerWristSlice(x: Float, y: Float) {
+        // xử lý giống như cảm ứng thường
+        onTouch(MotionEvent.obtain(
+            SystemClock.uptimeMillis(),
+            SystemClock.uptimeMillis(),
+            MotionEvent.ACTION_MOVE,
+            x,
+            y,
+            0
+        ))
+    }
+
 }

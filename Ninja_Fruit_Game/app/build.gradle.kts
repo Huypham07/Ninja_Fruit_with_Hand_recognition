@@ -40,12 +40,18 @@ android {
 }
 
 dependencies {
-    implementation ("androidx.camera:camera-core:1.3.0")
+    implementation("androidx.camera:camera-core:1.3.0")
+
+    implementation(libs.tensorflow.lite.v2140)
+    implementation(libs.tensorflow.lite.gpu)
+    implementation(libs.tensorflow.lite.support)
+
     // CameraX
     implementation("androidx.camera:camera-core:1.3.0")
     implementation("androidx.camera:camera-camera2:1.3.0")
     implementation("androidx.camera:camera-lifecycle:1.3.0")
     implementation("androidx.camera:camera-view:1.3.0")
+    implementation("androidx.camera:camera-extensions:1.3.0")
 
     // MediaPipe Tasks Vision SDK (Google AI)
     implementation("com.google.mediapipe:tasks-vision:latest.release")
@@ -65,7 +71,6 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.constraintlayout)
-    implementation(libs.litert.api)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

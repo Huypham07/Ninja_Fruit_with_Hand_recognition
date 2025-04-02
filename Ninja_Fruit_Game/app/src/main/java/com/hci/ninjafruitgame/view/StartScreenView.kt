@@ -13,6 +13,7 @@ import androidx.core.animation.doOnEnd
 import androidx.core.graphics.toColorInt
 import com.hci.ninjafruitgame.R
 import kotlin.random.Random
+import androidx.core.graphics.withTranslation
 
 
 class StartScreenView @JvmOverloads constructor(
@@ -56,6 +57,12 @@ class StartScreenView @JvmOverloads constructor(
     private val shiftY = 100f
 
     private val largeShiftY = 250f
+
+    private var isRemovedBackground = false
+
+    fun removeBackground(remove: Boolean) {
+        isRemovedBackground = remove
+    }
 
     private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 800
@@ -107,7 +114,6 @@ class StartScreenView @JvmOverloads constructor(
         visibility = VISIBLE
         isExiting = false
         animator.start()
-        Log.d("statt", "ajsd")
     }
 
     private val frameCallback = object : Choreographer.FrameCallback {
@@ -138,7 +144,9 @@ class StartScreenView @JvmOverloads constructor(
     @SuppressLint("DrawAllocation")
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
+        if (!isRemovedBackground) {
+            canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
+        }
 
         val centerX = width / 2f
         val centerY = height / 2f
@@ -202,12 +210,11 @@ class StartScreenView @JvmOverloads constructor(
         canvas.drawBitmap(ring, -ring.width / 2f, -ring.height / 2f, paint)
         canvas.restore()
 
-        canvas.save()
-        canvas.translate(x, y)
-        canvas.rotate(fruitRot)
-        canvas.scale(scale, scale)
-        canvas.drawBitmap(fruit, -fruit.width / 2f, -fruit.height / 2f, paint)
-        canvas.restore()
+        canvas.withTranslation(x, y) {
+            rotate(fruitRot)
+            scale(scale, scale)
+            drawBitmap(fruit, -fruit.width / 2f, -fruit.height / 2f, paint)
+        }
     }
 
 
@@ -250,6 +257,7 @@ class StartScreenView @JvmOverloads constructor(
         }
     }
 
+    @SuppressLint("DiscouragedApi")
     private fun addStartSplash(x: Float, y: Float, name: String) {
         val splashResId = resources.getIdentifier("${name}_s", "drawable", context.packageName)
 

@@ -4,7 +4,23 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+
+
     <!-- Màn hình mở đầu -->
+    <com.hci.ninjafruitgame.view.CameraPreviewView
+        android:id="@+id/cameraPreview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <!-- Trong activity_main.xml -->
+    <com.hci.ninjafruitgame.view.SkeletonOverlayView
+        android:id="@+id/skeletonOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:visibility="gone"/>
+
     <com.hci.ninjafruitgame.view.GameView
         android:id="@+id/gameView"
         android:layout_width="match_parent"

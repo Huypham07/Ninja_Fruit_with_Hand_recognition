@@ -13,6 +13,7 @@ import com.hci.ninjafruitgame.model.Bomb
 import com.hci.ninjafruitgame.model.GameObjectType
 import com.hci.ninjafruitgame.model.SlicedPiece
 import kotlin.random.Random
+import androidx.core.content.edit
 
 class GameView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -72,6 +73,12 @@ class GameView @JvmOverloads constructor(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val gravity = 0.6f
     private var spawnCounter = 0
+
+    private var isRemovedBackground = false
+
+    fun removeBackground(remove: Boolean) {
+        isRemovedBackground = remove
+    }
 
     private val gameLoop = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
@@ -178,7 +185,6 @@ class GameView @JvmOverloads constructor(
             )
 
             fruits.add(fruit)
-            Log.d("test", "spawn fruit")
         } else if (type == GameObjectType.TYPE_BOMB.value) {
             val bomb = Bomb(
                 bitmap = bitmap, position = PointF(startX, height.toFloat()),
@@ -187,7 +193,6 @@ class GameView @JvmOverloads constructor(
             )
 
             bombs.add(bomb)
-            Log.d("test", "spawn bomb")
 
         }
     }
@@ -215,7 +220,9 @@ class GameView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
+        if (!isRemovedBackground) {
+            canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
+        }
 
         splashMarks.forEach { it.draw(canvas, paint) }
         fruits.forEach { it.draw(canvas) }
@@ -231,6 +238,7 @@ class GameView @JvmOverloads constructor(
         sliceAt(x, y)
     }
 
+    @SuppressLint("DiscouragedApi")
     fun sliceAt(x: Float, y: Float) {
         fruits.forEach { fruit ->
             if (!fruit.isSliced) {
@@ -254,10 +262,10 @@ class GameView @JvmOverloads constructor(
 
                     if (currentScore > bestScore) {
                         bestScore = currentScore
-                        prefs.edit().putInt("best_score", bestScore).apply()
+                        prefs.edit { putInt("best_score", bestScore) }
                     }
 
-                    var fruitColor = fruitColorMap[fruit.bitmapResId] ?: Color.WHITE
+                    val fruitColor = fruitColorMap[fruit.bitmapResId] ?: Color.WHITE
                     emitParticles(centerX, centerY, fruitColor)
                     addSplashMark(centerX, centerY, fruit.bitmapResId)
 
@@ -301,6 +309,7 @@ class GameView @JvmOverloads constructor(
         }
     }
 
+    @SuppressLint("DiscouragedApi")
     private fun addSplashMark(x: Float, y: Float, fruitResId: Int) {
         val resName = resources.getResourceEntryName(fruitResId)
         val splashResId = resources.getIdentifier("${resName}_s", "drawable", context.packageName)

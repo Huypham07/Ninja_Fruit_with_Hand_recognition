@@ -11,6 +11,7 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.View
 import kotlin.math.sin
+import androidx.core.graphics.withScale
 
 class CountdownOverlay @JvmOverloads constructor(
     context: Context,
@@ -97,13 +98,10 @@ class CountdownOverlay @JvmOverloads constructor(
         val elapsed = System.currentTimeMillis() - startTime
         scaleFactor = 1f + 0.2f * sin((elapsed % 700) / 700f * Math.PI).toFloat()
 
-        canvas.save()
-        canvas.scale(scaleFactor, scaleFactor, width / 2f, height / 2f)
-
-        val displayText = if (count == 0) "GO!" else count.toString()
-        canvas.drawText(displayText, width / 2f, height / 2f, paint)
-
-        canvas.restore()
+        canvas.withScale(scaleFactor, scaleFactor, width / 2f, height / 2f) {
+            val displayText = if (count == 0) "GO!" else count.toString()
+            drawText(displayText, width / 2f, height / 2f, paint)
+        }
         invalidate()
     }
 

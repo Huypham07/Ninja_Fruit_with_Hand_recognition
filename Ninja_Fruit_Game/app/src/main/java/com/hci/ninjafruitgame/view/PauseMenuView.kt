@@ -9,10 +9,12 @@ import android.util.Log
 import android.view.Choreographer
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import android.widget.Toast
 import androidx.core.animation.doOnEnd
 import com.hci.ninjafruitgame.R
 import kotlin.random.Random
 import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withTranslation
 
 class PauseMenuView @JvmOverloads constructor(
     context: Context,
@@ -54,15 +56,24 @@ class PauseMenuView @JvmOverloads constructor(
     private var prevBgRect = RectF()
     private var nextBgRect = RectF()
 
+    private var cameraRect = RectF()
+    private var handRect = RectF()
+
     private var currentBgIndex = 1
-    var onBackgroundChange: ((Int) -> Unit)? = null
 
     private var isGameStarted = false
     private var isExiting = false
 
+    var onBackgroundChange: ((Int) -> Unit)? = null
     var onBackToStart: (() -> Unit)? = null
     var onResume: (() -> Unit)? = null
     var onRestart: (() -> Unit)? = null
+    var onToggleCameraBackground: ((Boolean) -> Unit)? = null
+    var onToggleHandDetection: ((Boolean) -> Unit)? = null
+
+    private var isUsedCamera = false
+    private var isUsedHand = false
+
 
     private val introAnim = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 600
@@ -97,7 +108,7 @@ class PauseMenuView @JvmOverloads constructor(
                 titleY = 40f - value * 150f
                 bgY = 150f - value * 600f
 
-                btnY = 870f + value * 100f
+                btnY = 870f + value * 300f
 
                 ringScale = 0.7f + value * 0.5f
                 exitAlpha = 1f - value
@@ -164,23 +175,23 @@ class PauseMenuView @JvmOverloads constructor(
         val destRect = Rect(left, top, right, bottom)
         canvas.drawBitmap(bgBitmap, null, destRect, paint)
 
-        // Draw background index control row
-        val text = "Background: $currentBgIndex"
-        paint.color = "#68351a".toColorInt()
-        paint.textSize = 52f
-        paint.textAlign = Paint.Align.CENTER
-        canvas.drawText(text, centerX, bgY + scaledHeight / 2 - 20, paint)
-
         val iconSize = 80f
         val prevX = centerX - 280f
         val nextX = centerX + 200f
-        val iconY = (bgY + scaledHeight / 2f - 80f).toInt()
+        val icon1Y = (bgY + scaledHeight / 2f - 80f).toInt()
+        val icon2Y = (bgY + scaledHeight - 190f).toInt()
 
-        prevBgRect.set(prevX, iconY.toFloat(), prevX + iconSize, iconY + iconSize.toFloat())
-        nextBgRect.set(nextX, iconY.toFloat(), nextX + iconSize, iconY + iconSize.toFloat())
+        prevBgRect.set(prevX, icon1Y.toFloat(), prevX + iconSize, icon1Y + iconSize)
+        nextBgRect.set(nextX, icon1Y.toFloat(), nextX + iconSize, icon1Y + iconSize)
 
         canvas.drawBitmap(prevBgBitmap, null, prevBgRect, paint)
         canvas.drawBitmap(nextBgBitmap, null, nextBgRect, paint)
+
+        cameraRect.set(prevX, icon2Y.toFloat(), prevX + iconSize, icon2Y + iconSize)
+        handRect.set(nextX, icon2Y.toFloat(), nextX + iconSize, icon2Y + iconSize)
+
+        canvas.drawBitmap(prevBgBitmap, null, cameraRect, paint)
+        canvas.drawBitmap(nextBgBitmap, null, handRect, paint)
 
         if (isGameStarted) {
             // Tính chiều rộng vùng bg_settings đã vẽ
@@ -227,29 +238,33 @@ class PauseMenuView @JvmOverloads constructor(
             canvas.drawBitmap(btnHome, null, homeRect, paint)
             canvas.drawBitmap(btnRestart, null, restartRect, paint)
             canvas.drawBitmap(btnResume, null, resumeRect, paint)
-
         } else {
             drawBackFruit(canvas, 260f, 800f)
         }
 
         splashMarks.forEach { it.draw(canvas, paint) }
         particles.forEach { it.draw(canvas, paint) }
+
+        // Draw background index control row
+        val text = "Background: $currentBgIndex"
+        paint.color = "#68351a".toColorInt()
+        paint.textSize = 52f
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText(text, centerX, bgY + scaledHeight / 2 - 20, paint)
     }
 
     private fun drawBackFruit(canvas: Canvas, x: Float, y: Float) {
-        canvas.save()
-        canvas.translate(x, y)
-        canvas.rotate(ringRotation)
-        canvas.scale(ringScale, ringScale)
-        canvas.drawBitmap(ringBitmap, -ringBitmap.width / 2f, -ringBitmap.height / 2f, paint)
-        canvas.restore()
+        canvas.withTranslation(x, y) {
+            rotate(ringRotation)
+            scale(ringScale, ringScale)
+            drawBitmap(ringBitmap, -ringBitmap.width / 2f, -ringBitmap.height / 2f, paint)
+        }
 
-        canvas.save()
-        canvas.translate(x, y)
-        canvas.rotate(fruitRotation)
-        canvas.scale(ringScale, ringScale)
-        canvas.drawBitmap(fruitBitmap, -fruitBitmap.width / 2f, -fruitBitmap.height / 2f, paint)
-        canvas.restore()
+        canvas.withTranslation(x, y) {
+            rotate(fruitRotation)
+            scale(ringScale, ringScale)
+            drawBitmap(fruitBitmap, -fruitBitmap.width / 2f, -fruitBitmap.height / 2f, paint)
+        }
     }
 
     private var canChangeBg = true
@@ -270,6 +285,14 @@ class PauseMenuView @JvmOverloads constructor(
                 if (currentBgIndex < 6) currentBgIndex++
                 onBackgroundChange?.invoke(currentBgIndex)
                 debounceBgChange()
+            }
+            cameraRect.contains(x, y) -> {
+                isUsedCamera = !isUsedCamera
+                onToggleCameraBackground?.invoke(isUsedCamera)
+            }
+            handRect.contains(x, y) -> {
+                isUsedHand = !isUsedHand
+                onToggleHandDetection?.invoke(isUsedHand)
             }
         }
         if (!isGameStarted) {
@@ -330,6 +353,7 @@ class PauseMenuView @JvmOverloads constructor(
         }
     }
 
+    @SuppressLint("DiscouragedApi")
     private fun addSplash(x: Float, y: Float) {
         val splashResId = resources.getIdentifier("bomb_s", "drawable", context.packageName)
         if (splashResId != 0) {
