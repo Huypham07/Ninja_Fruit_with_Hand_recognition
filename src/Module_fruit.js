@@ -85,6 +85,23 @@
   //throw fruit
   throwFruit = function () {
     var textureObj = assetsManager.getRandomFruit();
+    // Special fruit spawn chance (5%)
+    const specialFruitChance = Math.random();
+    if (specialFruitChance < 0.05) { // 5% chance for special fruits
+      // Randomly choose between freeze and explode (50/50)
+      if (Math.random() < 0.5) {
+        textureObj = assetsManager.fruitsObj["freeze_fruit"];
+        console.log("Spawning freeze fruit");
+      } else {
+        textureObj = assetsManager.fruitsObj["explode_fruit"];
+        console.log("Spawning explode fruit");
+      }
+    } else {
+      // Get random normal fruit
+      const normalFruits = ["apple", "basaha", "peach", "sandia"];
+      const randomIndex = Math.floor(Math.random() * normalFruits.length);
+      textureObj = assetsManager.fruitsObj[normalFruits[randomIndex]];
+    }
 
     var p = fruitSystem.createParticle(Fruit);
     p.velocity.reset(0, -(10 + Math.random() * 3));
@@ -115,45 +132,49 @@
         if (fruit !== target) {
           //console.log(fruit);
           fruit.velocity.reset(0, 0);
-          fruit.damp.reset(1, 1);
+          //fruit.damp.reset(1, 1);
           fruit.removeForce("g");
-          fruit.removeForce('rotation');
+          //fruit.removeForce('rotation');
         }
       })
       bombSystem.getParticles().forEach(bomb => {
         bomb.velocity.reset(0, 0);
-        bomb.damp.reset(1, 1);
+        //bomb.damp.reset(1, 1);
         bomb.removeForce("g");
       })
+
+      setTimeout(() => {
+        isFrozen = false;
+        console.log(fruitSystem.getParticles());
+        fruitSystem.getParticles().forEach(fruit => {
+          fruit.addForce("g", gravity);
+        })
+        bombSystem.getParticles().forEach(bomb => {
+          bomb.addForce("g", gravity);
+        })
+      }, 5000)
+
+
     }
-    // if (target.textureObj === assetsManager.fruitsObj["freeze_fruit"]) {
-    //   // Store original velocities
-    //   fruitSystem.particles.forEach(fruit => {
-    //     if (fruit !== target) {
-    //       originalVelocities.set(fruit, {
-    //         x: fruit.velocity.x,
-    //         y: fruit.velocity.y
-    //       });
-    //       // Freeze the fruit
-    //       fruit.velocity.reset(0, 0);
-    //     }
-    //   });
 
-    //   // Start the freeze effect
-    //   isFrozen = true;
-    //   setTimeout(() => {
-    //     // Unfreeze after 5 seconds
-    //     isFrozen = false;
-    //     fruitSystem.particles.forEach(fruit => {
-    //       const originalVel = originalVelocities.get(fruit);
-    //       if (originalVel) {
-    //         fruit.velocity.reset(originalVel.x, originalVel.y);
-    //       }
-    //     });
-    //     originalVelocities.clear();
-    //   }, FREEZE_DURATION);
-    // }
+    else if (target.textureObj === assetsManager.fruitsObj["explode_fruit"]) {
+      console.log("Explode fruit hit!"); // Debug log
 
+      // Get all active fruits except the explode fruit
+      const activeFruits = fruitSystem.getParticles().filter(fruit =>
+        fruit !== target && fruit.life > 0
+      );
+
+      // Cut all active fruits
+      activeFruits.forEach(fruit => {
+        fruit.removeEventListener("dead", missHandler);
+        buildHalfFruit(fruit);
+        buildJuice(fruit, ((Math.random() * 30) >> 0) + 30);
+        buildSplash(fruit);
+        fruit.life = 0;
+        score++; // Add score for each exploded fruit
+      });
+    }
 
     score++;
     target.removeEventListener("dead", missHandler);
@@ -167,9 +188,12 @@
   };
   missHandler = function (e) {
     e.target.removeEventListener("dead", missHandler);
-    if (gameState == GAME_OVER) return;
+    if (e.target.textureObj === assetsManager.fruitsObj["freeze_fruit"] ||
+      e.target.textureObj === assetsManager.fruitsObj["explode_fruit"]) {
+      return; // Don't reduce life for special fruits
+    }
     missFruit(e.target);
-    //gameLife--;
+    gameLife--;
     if (gameLife == 0) gameOver();
     if (gameLife < 0) gameLife = 0;
     ui_gamelifeTexture = assetsManager["gamelife-" + gameLife];

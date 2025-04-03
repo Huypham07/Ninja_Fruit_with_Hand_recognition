@@ -1,6 +1,6 @@
 var Game = {
   assets: {
-    fruits: ["apple", "basaha", "peach", "sandia", "freeze_fruit"],
+    fruits: ["apple", "basaha", "peach", "sandia", "freeze_fruit", "explode_fruit"],
 
     other: [
       { id: "gameover", src: "assets/gameover.png" },
