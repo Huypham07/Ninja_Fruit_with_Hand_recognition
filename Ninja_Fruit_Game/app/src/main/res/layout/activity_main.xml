@@ -6,28 +6,25 @@
 
 
 
-    <!-- Màn hình mở đầu -->
-    <com.hci.ninjafruitgame.view.CameraPreviewView
-        android:id="@+id/cameraPreview"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone" />
-
-    <!-- Trong activity_main.xml -->
-    <com.hci.ninjafruitgame.view.SkeletonOverlayView
-        android:id="@+id/skeletonOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_gravity="center"
+    <com.hci.ninjafruitgame.view.vision.CameraSourcePreview
+        android:id="@+id/preview_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:visibility="gone"/>
 
-    <com.hci.ninjafruitgame.view.GameView
+    <com.hci.ninjafruitgame.view.vision.GraphicOverlay
+        android:id="@+id/graphic_overlay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"/>
+
+    <com.hci.ninjafruitgame.view.game.GameView
         android:id="@+id/gameView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"/>
 
-    <com.hci.ninjafruitgame.view.StartScreenView
+    <com.hci.ninjafruitgame.view.game.StartScreenView
         android:id="@+id/startScreen"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
@@ -42,19 +39,19 @@
         android:visibility="visible"
         />
 
-    <com.hci.ninjafruitgame.view.PauseMenuView
+    <com.hci.ninjafruitgame.view.game.PauseMenuView
         android:id="@+id/pauseMenuContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"/>
 
-    <com.hci.ninjafruitgame.view.CountdownOverlay
+    <com.hci.ninjafruitgame.view.game.CountdownOverlay
         android:id="@+id/countdownOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <com.hci.ninjafruitgame.view.FruitSliceView
+    <com.hci.ninjafruitgame.view.game.FruitSliceView
         android:id="@+id/view"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
