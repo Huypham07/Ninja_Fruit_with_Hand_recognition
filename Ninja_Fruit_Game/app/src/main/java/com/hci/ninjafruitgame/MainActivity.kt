@@ -1,7 +1,11 @@
 package com.hci.ninjafruitgame
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.content.Context
+import android.content.pm.PackageManager
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -10,17 +14,34 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.ImageView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.hci.ninjafruitgame.view.CountdownOverlay
-import com.hci.ninjafruitgame.view.FruitSliceView
-import com.hci.ninjafruitgame.view.GameView
-import com.hci.ninjafruitgame.view.PauseMenuView
-import com.hci.ninjafruitgame.view.SliceEffectReceiver
-import com.hci.ninjafruitgame.view.StartScreenView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.hci.ninjafruitgame.view.game.CountdownOverlay
+import com.hci.ninjafruitgame.view.game.FruitSliceView
+import com.hci.ninjafruitgame.view.game.GameView
+import com.hci.ninjafruitgame.view.game.PauseMenuView
+import com.hci.ninjafruitgame.view.game.SliceEffectReceiver
+import com.hci.ninjafruitgame.view.game.StartScreenView
 import kotlin.system.exitProcess
 import androidx.core.view.isVisible
+import com.hci.ninjafruitgame.posedetector.HandLandmarkListener
+import com.hci.ninjafruitgame.posedetector.HandTracker
+import com.hci.ninjafruitgame.posedetector.PoseDetectorProcessor
+import com.hci.ninjafruitgame.preference.PreferenceUtils
+import com.hci.ninjafruitgame.view.vision.CameraSource
+import com.hci.ninjafruitgame.view.vision.CameraSourcePreview
+import com.hci.ninjafruitgame.view.vision.GraphicOverlay
+import java.io.IOException
+import java.util.ArrayList
 
 class MainActivity : AppCompatActivity() {
+    private var cameraSource: CameraSource? = null
+    private var preview: CameraSourcePreview? = null
+    private var graphicOverlay: GraphicOverlay? = null
+
+    private var mediaPlayer: MediaPlayer? = null
 
     private lateinit var fruitSliceView: FruitSliceView
     private lateinit var gameView: GameView
@@ -30,31 +51,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnPause: ImageView
 
     private var isGameStarted = false
+    private var handDetectionEnabled = false
+    private var isMuted = false
 
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // FULL SCREEN MODE
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let {
-                it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    )
-        }
-
+        enableFullScreen()
 
         fruitSliceView = findViewById(R.id.view)
         gameView = findViewById(R.id.gameView)
@@ -63,7 +68,20 @@ class MainActivity : AppCompatActivity() {
         countdownOverlay = findViewById(R.id.countdownOverlay)
         btnPause = findViewById(R.id.btnPause)
 
+        preview = findViewById(R.id.preview_view)
+        if (preview == null) {
+            Log.d(TAG, "Preview is null")
+        }
+
+        graphicOverlay = findViewById(R.id.graphic_overlay)
+        if (graphicOverlay == null) {
+            Log.d(TAG, "graphicOverlay is null")
+        }
+
+        PreferenceUtils.hideDetectionInfo(this)
         updatePauseMenuBackground()
+
+        startMusic(applicationContext)
 
         startScreen.onStartGame = {
             isGameStarted = true
@@ -146,6 +164,46 @@ class MainActivity : AppCompatActivity() {
             startScreen.setBackground(resId)
         }
 
+        pauseMenu.onToggleCameraBackground = { enabled ->
+            if (handDetectionEnabled) {
+                gameView.removeBackground(enabled)
+                startScreen.removeBackground(enabled)
+            } else {
+                pauseMenu.hideCameraBackground()
+                gameView.removeBackground(false)
+                startScreen.removeBackground(false)
+
+                Toast.makeText(applicationContext, "Enable hand detection to use this feature", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+// And modify your hand detection toggle:
+        pauseMenu.onToggleHandDetection = { enabled ->
+            handDetectionEnabled = enabled
+            gameView.setHandDetection(enabled)
+            if (enabled) {
+                graphicOverlay?.visibility = View.VISIBLE
+                preview?.visibility = View.VISIBLE
+
+                createCameraSource()
+                startCameraSource()
+                Toast.makeText(applicationContext, "Hand detection enabled", Toast.LENGTH_SHORT).show()
+            } else {
+                pauseMenu.hideCameraBackground()
+                gameView.removeBackground(false)
+                startScreen.removeBackground(false)
+
+                preview?.visibility = View.GONE
+                graphicOverlay?.visibility = View.GONE
+                cameraSource?.stop()
+                Toast.makeText(applicationContext, "Hand detection disabled", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        pauseMenu.onToggleMute = { isMuted ->
+            muteMusic(isMuted)
+        }
+
         gameView.setOnPauseRequestedListener {
             if (countdownOverlay.isVisible) {
                 countdownOverlay.cancelCountdown()
@@ -154,7 +212,62 @@ class MainActivity : AppCompatActivity() {
             gameView.pauseGame()
             pauseMenu.visibility = View.VISIBLE
         }
+
+        if (!allRuntimePermissionsGranted()) {
+            getRuntimePermissions()
+        }
     }
+
+    /**
+     * Starts or restarts the camera source, if it exists. If the camera source doesn't exist yet
+     * (e.g., because onResume was called before the camera source was created), this will be called
+     * again when the camera source is created.
+     */
+    private fun startCameraSource() {
+        if (cameraSource != null) {
+            try {
+                if (preview == null) {
+                    Log.d(TAG, "resume: Preview is null")
+                }
+                if (graphicOverlay == null) {
+                    Log.d(TAG, "resume: graphOverlay is null")
+                }
+                preview!!.start(cameraSource, graphicOverlay)
+            } catch (e: IOException) {
+                Log.e(TAG, "Unable to start camera source.", e)
+                cameraSource!!.release()
+                cameraSource = null
+            }
+        }
+    }
+
+    /** Stops the camera. */
+    override fun onPause() {
+        super.onPause()
+        if (handDetectionEnabled) {
+            preview?.stop()
+        }
+        muteMusic(true)
+    }
+
+    public override fun onResume() {
+        super.onResume()
+        if (handDetectionEnabled) {
+            createCameraSource()
+            startCameraSource()
+        }
+        if (isMuted && !pauseMenu.getIsMuted()) {
+            muteMusic(false)
+        }
+    }
+
+    public override fun onDestroy() {
+        super.onDestroy()
+        if (cameraSource != null) {
+            cameraSource?.release()
+        }
+    }
+
 
     private fun updatePauseMenuBackground() {
         if (isGameStarted) {
@@ -186,5 +299,195 @@ class MainActivity : AppCompatActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
+    private var handTracker: HandTracker? = null
+
+    private fun createCameraSource() {
+        // If there's no existing cameraSource, create one.
+        if (cameraSource == null) {
+            cameraSource = CameraSource(this, graphicOverlay)
+        }
+        try {
+            val poseDetectorOptions = PreferenceUtils.getPoseDetectorOptionsForLivePreview(this)
+            Log.i(TAG, "Using Pose Detector with options $poseDetectorOptions")
+            val shouldShowInFrameLikelihood =
+                PreferenceUtils.shouldShowPoseDetectionInFrameLikelihoodLivePreview(this)
+            val visualizeZ = PreferenceUtils.shouldPoseDetectionVisualizeZ(this)
+            val rescaleZ = PreferenceUtils.shouldPoseDetectionRescaleZForVisualization(this)
+
+            handTracker = HandTracker(
+//                minCutoff = 1.0f,
+//                beta = 0.0f,
+                movementThreshold = 3f,
+                listener = object : HandLandmarkListener {
+                    override fun onHandLandmarksReceived(
+                        leftIndexX: Float?, leftIndexY: Float?,
+                        rightIndexX: Float?, rightIndexY: Float?
+                    ) {
+                        if (leftIndexX != null && leftIndexY != null) {
+                            val x = leftIndexX
+                            val y = leftIndexY
+
+                            gameView.updateLeftHandPosition(x, y)
+                            startScreen.updateLeftHandPosition(x, y)
+                            pauseMenu.updateLeftHandPosition(x, y)
+                        }
+
+                        if (rightIndexX != null && rightIndexY != null) {
+                            val x = rightIndexX
+                            val y = rightIndexY
+
+                            gameView.updateRightHandPosition(x, y)
+                            startScreen.updateRightHandPosition(x, y)
+                            pauseMenu.updateRightHandPosition(x, y)
+
+                            // ✨ 1. Gọi hiệu ứng dao
+                            val fakeEvent = MotionEvent.obtain(
+                                System.currentTimeMillis(),
+                                System.currentTimeMillis(),
+                                MotionEvent.ACTION_MOVE,
+                                x,
+                                y,
+                                0
+                            )
+                            fruitSliceView.onTouch(fakeEvent)
+                            fakeEvent.recycle()
+
+                            // ✨ 2. Gọi slice effect tương tự như dispatchTouchEvent
+                            val receiver: SliceEffectReceiver = when {
+                                pauseMenu.isVisible -> pauseMenu
+                                !isGameStarted -> startScreen
+                                !gameView.getIsPaused() -> gameView
+                                else -> return
+                            }
+                            receiver.onSliceAt(x, y)
+                        }
+                    }
+                }
+            )
+
+
+            val processor = PoseDetectorProcessor(
+                this,
+                poseDetectorOptions,
+                shouldShowInFrameLikelihood,
+                visualizeZ,
+                rescaleZ
+            )
+
+            processor.setHandLandmarkListener(object : HandLandmarkListener {
+                override fun onHandLandmarksReceived(
+                    leftIndexX: Float?, leftIndexY: Float?,
+                    rightIndexX: Float?, rightIndexY: Float?
+                ) {
+                    handTracker?.update(leftIndexX, leftIndexY, rightIndexX, rightIndexY)
+                }
+            })
+
+            cameraSource!!.setMachineLearningFrameProcessor(processor)
+        } catch (e: Exception) {
+            Log.e(TAG, "Can not create image processor", e)
+            Toast.makeText(
+                applicationContext,
+                "Can not create image processor: " + e.message,
+                Toast.LENGTH_LONG
+            )
+                .show()
+        }
+    }
+
+    private fun enableFullScreen() {
+        @Suppress("DEPRECATION")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                            View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
+        }
+    }
+
+    private fun allRuntimePermissionsGranted(): Boolean {
+        for (permission in REQUIRED_RUNTIME_PERMISSIONS) {
+            permission.let {
+                if (!isPermissionGranted(this, it)) {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
+    private fun getRuntimePermissions() {
+        val permissionsToRequest = ArrayList<String>()
+        for (permission in REQUIRED_RUNTIME_PERMISSIONS) {
+            permission.let {
+                if (!isPermissionGranted(this, it)) {
+                    permissionsToRequest.add(permission)
+                }
+            }
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                this,
+                permissionsToRequest.toTypedArray(),
+                PERMISSION_REQUESTS
+            )
+        }
+    }
+
+    private fun isPermissionGranted(context: Context, permission: String): Boolean {
+        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.i(TAG, "Permission granted: $permission")
+            return true
+        }
+        Log.i(TAG, "Permission NOT granted: $permission")
+        return false
+    }
+
+    fun startMusic(context: Context) {
+        if (mediaPlayer == null) {
+            mediaPlayer = MediaPlayer.create(context, R.raw.theme_song)
+            mediaPlayer?.isLooping = true
+        }
+        if (!isMuted) {
+            mediaPlayer?.start()
+        }
+    }
+
+    fun muteMusic(isMuted: Boolean) {
+        this.isMuted = isMuted
+        if (mediaPlayer == null) {
+            return
+        }
+        if (isMuted) {
+            mediaPlayer?.pause()
+        } else {
+            mediaPlayer?.start()
+        }
+    }
+
+    companion object {
+        private const val TAG = "MainActivity"
+        private const val PERMISSION_REQUESTS = 1
+
+        private val REQUIRED_RUNTIME_PERMISSIONS =
+            arrayOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            )
+    }
 }
+
 

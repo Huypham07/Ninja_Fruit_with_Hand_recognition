@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.PointF
 import android.graphics.RectF
+import androidx.core.graphics.withRotation
 
 data class Bomb(
     val bitmap: Bitmap,
@@ -24,10 +25,13 @@ data class Bomb(
 
     fun draw(canvas: Canvas) {
         if (!isSliced) {
-            val save = canvas.save()
-            canvas.rotate(rotation, position.x + bitmap.width / 2, position.y + bitmap.height / 2)
-            canvas.drawBitmap(bitmap, position.x, position.y, null)
-            canvas.restoreToCount(save)
+            canvas.withRotation(
+                rotation,
+                position.x + bitmap.width / 2,
+                position.y + bitmap.height / 2
+            ) {
+                canvas.drawBitmap(bitmap, position.x, position.y, null)
+            }
         }
     }
 
