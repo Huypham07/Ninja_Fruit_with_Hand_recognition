@@ -181,6 +181,7 @@ class MainActivity : AppCompatActivity() {
         pauseMenu.onToggleHandDetection = { enabled ->
             handDetectionEnabled = enabled
             gameView.setHandDetection(enabled)
+            startScreen.setHandDetection(enabled)
             if (enabled) {
                 graphicOverlay?.visibility = View.VISIBLE
                 preview?.visibility = View.VISIBLE
