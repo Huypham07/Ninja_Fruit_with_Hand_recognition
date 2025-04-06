@@ -21,9 +21,10 @@ jobs:
 
       - name: Build APK
         run: ./gradlew assembleDebug
+        working-directory: Ninja_Fruit_Game
 
       - name: Upload debug APK as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: Ninja_Fruit_Game/app/build/outputs/apk/debug/app-debug.apk
