@@ -18,7 +18,7 @@ class FruitSliceView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private var maxLen = 10 // độ dài tối đa của đường dao
-    private var addWidth = 3f // độ rộng tăng thêm
+    private var addWidth = 2f // độ rộng tăng thêm
 
     private val pointFS: Deque<PointF> = ArrayDeque(maxLen) // mép trên đường dao
     private val pointFSClose: Deque<PointF> = ArrayDeque(maxLen) // mép dưới đường dao

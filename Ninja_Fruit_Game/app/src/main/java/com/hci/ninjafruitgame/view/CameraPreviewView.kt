@@ -25,8 +25,8 @@ class CameraPreviewView @JvmOverloads constructor(
     private lateinit var previewView: PreviewView
     fun getPreviewView(): PreviewView = previewView
 
-    private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
-    private var poseAnalyzer: PoseCameraAnalyzer? = null
+    private val analyzerExecutor = Executors.newSingleThreadExecutor()
+
 
     init {
         initView()
@@ -56,7 +56,7 @@ class CameraPreviewView @JvmOverloads constructor(
                 .build()
 
             if (analyzer != null) {
-                analysis.setAnalyzer(Executors.newSingleThreadExecutor(), analyzer)
+                analysis.setAnalyzer(analyzerExecutor, analyzer)
             }
 
             val cameraSelector = CameraSelector.Builder()
