@@ -496,24 +496,24 @@ class MainActivity : AppCompatActivity() {
         if (mediaPlayer == null) {
             return
         }
-        if (isMuted) {
-            mediaPlayer?.pause()
-        } else {
-            mediaPlayer?.start()
-        }
-    }
+        if (isMuted){
+    mediaPlayer?.pause()
+} else {
+    mediaPlayer?.start()
+}
+}
 
-    companion object {
-        private const val TAG = "MainActivity"
-        private const val PERMISSION_REQUESTS = 1
+companion object {
+    private const val TAG = "MainActivity"
+    private const val PERMISSION_REQUESTS = 1
 
-        private val REQUIRED_RUNTIME_PERMISSIONS =
-            arrayOf(
-                Manifest.permission.CAMERA,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            )
-    }
+    private val REQUIRED_RUNTIME_PERMISSIONS =
+        arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        )
+}
 }
 
 
