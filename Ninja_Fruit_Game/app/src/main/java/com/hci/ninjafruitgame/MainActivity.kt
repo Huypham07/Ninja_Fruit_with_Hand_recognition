@@ -8,6 +8,8 @@ import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
@@ -30,6 +32,7 @@ import com.hci.ninjafruitgame.posedetector.HandLandmarkListener
 import com.hci.ninjafruitgame.posedetector.HandTracker
 import com.hci.ninjafruitgame.posedetector.PoseDetectorProcessor
 import com.hci.ninjafruitgame.preference.PreferenceUtils
+import com.hci.ninjafruitgame.utils.SoundManager
 import com.hci.ninjafruitgame.view.vision.CameraSource
 import com.hci.ninjafruitgame.view.vision.CameraSourcePreview
 import com.hci.ninjafruitgame.view.vision.GraphicOverlay
@@ -53,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     private var isGameStarted = false
     private var handDetectionEnabled = false
     private var isMuted = false
+    private var isGameOver = false
 
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,6 +85,7 @@ class MainActivity : AppCompatActivity() {
         PreferenceUtils.hideDetectionInfo(this)
         updatePauseMenuBackground()
 
+        SoundManager.init(applicationContext)
         startMusic(applicationContext)
 
         startScreen.onStartGame = {
@@ -177,7 +182,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-// And modify your hand detection toggle:
         pauseMenu.onToggleHandDetection = { enabled ->
             handDetectionEnabled = enabled
             gameView.setHandDetection(enabled)
@@ -189,6 +193,7 @@ class MainActivity : AppCompatActivity() {
                 createCameraSource()
                 startCameraSource()
                 Toast.makeText(applicationContext, "Hand detection enabled", Toast.LENGTH_SHORT).show()
+                pauseMenu.updateCameraBackground(true)
             } else {
                 pauseMenu.hideCameraBackground()
                 gameView.removeBackground(false)
@@ -212,6 +217,21 @@ class MainActivity : AppCompatActivity() {
 
             gameView.pauseGame()
             pauseMenu.visibility = View.VISIBLE
+        }
+
+        gameView.setOnGameOverListener {
+            isGameOver = true
+            btnPause.visibility = View.GONE
+            Handler(Looper.getMainLooper()).postDelayed({
+                gameView.resetGame()
+                gameView.pauseGame()
+                gameView.visibility = View.GONE
+                startScreen.show()
+                isGameStarted = false
+                isGameOver = false
+                updatePauseMenuBackground()
+            }, 4000)
+
         }
 
         if (!allRuntimePermissionsGranted()) {
@@ -279,22 +299,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+//        if (handDetectionEnabled && !pauseMenu.isVisible) {
+//            return true
+//        }
 
         if (!gameView.getIsPaused() || (gameView.getIsPaused() && !isGameStarted)) {
             fruitSliceView.onTouch(ev) // hiển thị hiệu ứng dao
         }
-        if (ev.action == MotionEvent.ACTION_DOWN || ev.action == MotionEvent.ACTION_MOVE) {
+        if (
+            ev.actionMasked == MotionEvent.ACTION_DOWN ||
+            ev.actionMasked == MotionEvent.ACTION_MOVE ||
+            ev.actionMasked == MotionEvent.ACTION_POINTER_DOWN
+        ) {
+            for (i in 0 until ev.pointerCount) {
+                val x = ev.getX(i)
+                val y = ev.getY(i)
 
-            val x = ev.x
-            val y = ev.y
+                val receiver: SliceEffectReceiver = when {
+                    pauseMenu.isVisible -> pauseMenu
+                    !isGameStarted -> startScreen
+                    !gameView.getIsPaused() -> gameView
+                    else -> continue
+                }
 
-            val receiver: SliceEffectReceiver = when {
-                pauseMenu.isVisible -> pauseMenu
-                !isGameStarted -> startScreen
-                !gameView.getIsPaused() -> gameView
-                else -> return super.dispatchTouchEvent(ev)
+                receiver.onSliceAt(x, y)
             }
-            receiver.onSliceAt(x, y)
         }
 
         return super.dispatchTouchEvent(ev)
@@ -316,44 +345,38 @@ class MainActivity : AppCompatActivity() {
             val rescaleZ = PreferenceUtils.shouldPoseDetectionRescaleZForVisualization(this)
 
             handTracker = HandTracker(
-//                minCutoff = 1.0f,
-//                beta = 0.0f,
                 movementThreshold = 3f,
                 listener = object : HandLandmarkListener {
                     override fun onHandLandmarksReceived(
                         leftIndexX: Float?, leftIndexY: Float?,
                         rightIndexX: Float?, rightIndexY: Float?
                     ) {
-                        if (leftIndexX != null && leftIndexY != null) {
-                            val x = leftIndexX
-                            val y = leftIndexY
+                        processHand("left", leftIndexX, leftIndexY)
+                        processHand("right", rightIndexX, rightIndexY)
+                    }
 
-                            gameView.updateLeftHandPosition(x, y)
-                            startScreen.updateLeftHandPosition(x, y)
-                            pauseMenu.updateLeftHandPosition(x, y)
+                    private fun processHand(
+                        hand: String,
+                        x: Float?,
+                        y: Float?
+                    ) {
+                        if (x == null || y == null) return
+
+                        when (hand) {
+                            "left" -> {
+                                gameView.updateLeftHandPosition(x, y)
+                                startScreen.updateLeftHandPosition(x, y)
+                                pauseMenu.updateLeftHandPosition(x, y)
+                            }
+                            "right" -> {
+                                gameView.updateRightHandPosition(x, y)
+                                startScreen.updateRightHandPosition(x, y)
+                                pauseMenu.updateRightHandPosition(x, y)
+                            }
                         }
-
-                        if (rightIndexX != null && rightIndexY != null) {
-                            val x = rightIndexX
-                            val y = rightIndexY
-
-                            gameView.updateRightHandPosition(x, y)
-                            startScreen.updateRightHandPosition(x, y)
-                            pauseMenu.updateRightHandPosition(x, y)
-
-                            // ✨ 1. Gọi hiệu ứng dao
-                            val fakeEvent = MotionEvent.obtain(
-                                System.currentTimeMillis(),
-                                System.currentTimeMillis(),
-                                MotionEvent.ACTION_MOVE,
-                                x,
-                                y,
-                                0
-                            )
-                            fruitSliceView.onTouch(fakeEvent)
-                            fakeEvent.recycle()
-
-                            // ✨ 2. Gọi slice effect tương tự như dispatchTouchEvent
+                        fruitSliceView.registerHandSlice(if (hand == "left") 1001 else 1002, x, y) // nếu có
+                        if (!isGameOver) {
+                            // Gọi slice effect như dispatchTouchEvent
                             val receiver: SliceEffectReceiver = when {
                                 pauseMenu.isVisible -> pauseMenu
                                 !isGameStarted -> startScreen
@@ -362,9 +385,11 @@ class MainActivity : AppCompatActivity() {
                             }
                             receiver.onSliceAt(x, y)
                         }
+
                     }
                 }
             )
+
 
 
             val processor = PoseDetectorProcessor(
@@ -471,24 +496,24 @@ class MainActivity : AppCompatActivity() {
         if (mediaPlayer == null) {
             return
         }
-        if (isMuted) {
-            mediaPlayer?.pause()
-        } else {
-            mediaPlayer?.start()
-        }
-    }
+        if (isMuted){
+    mediaPlayer?.pause()
+} else {
+    mediaPlayer?.start()
+}
+}
 
-    companion object {
-        private const val TAG = "MainActivity"
-        private const val PERMISSION_REQUESTS = 1
+companion object {
+    private const val TAG = "MainActivity"
+    private const val PERMISSION_REQUESTS = 1
 
-        private val REQUIRED_RUNTIME_PERMISSIONS =
-            arrayOf(
-                Manifest.permission.CAMERA,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            )
-    }
+    private val REQUIRED_RUNTIME_PERMISSIONS =
+        arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        )
+}
 }
 
 

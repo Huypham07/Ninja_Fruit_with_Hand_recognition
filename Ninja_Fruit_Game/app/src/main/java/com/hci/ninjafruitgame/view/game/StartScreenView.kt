@@ -13,6 +13,7 @@ import androidx.core.graphics.toColorInt
 import com.hci.ninjafruitgame.R
 import kotlin.random.Random
 import androidx.core.graphics.withTranslation
+import com.hci.ninjafruitgame.utils.SoundManager
 
 
 class StartScreenView @JvmOverloads constructor(
@@ -225,10 +226,10 @@ class StartScreenView @JvmOverloads constructor(
         particles.forEach { it.draw(canvas, paint) }
 
         if (useHandDetection) {
-            canvas.drawCircle(leftHandX, leftHandY, 50f, leftIndexFillPaint)
-            canvas.drawCircle(leftHandX, leftHandY, 50f, leftIndexStrokePaint)
-            canvas.drawCircle(rightHandX, rightHandY, 50f, rightIndexFillPaint)
-            canvas.drawCircle(rightHandX, rightHandY, 50f, rightIndexStrokePaint)
+            canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
+            canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
+            canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
+            canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexStrokePaint)
         }
     }
 
@@ -264,6 +265,7 @@ class StartScreenView @JvmOverloads constructor(
             isSlicedAt(x, y, width / 2f + shiftX, height / 2f + shiftY, fruitBitmap) -> {
                 emitStartParticles(x, y, fruitColor)
                 addStartSplash(x, y, "peach")
+                SoundManager.playSlice()
                 playExitAnimation {
                     onStartGame?.invoke()
                 }
@@ -278,6 +280,7 @@ class StartScreenView @JvmOverloads constructor(
             ) -> {
                 emitStartParticles(x, y, fruitSettingColor)
                 addStartSplash(x, y, "apple")
+                SoundManager.playSlice()
                 onOpenSettings?.invoke()
 
             }
@@ -291,6 +294,7 @@ class StartScreenView @JvmOverloads constructor(
             ) -> {
                 emitStartParticles(x, y, fruitQuitColor)
                 addStartSplash(x, y, "bomb")
+                SoundManager.playSlice()
                 onQuit?.invoke()
             }
         }

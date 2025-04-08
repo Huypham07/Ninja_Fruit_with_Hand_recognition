@@ -35,7 +35,8 @@
         android:layout_height="36dp"
         android:src="@drawable/pause"
         android:layout_gravity="top|end"
-        android:layout_margin="20dp"
+        android:layout_marginTop="50dp"
+        android:layout_marginRight="20dp"
         android:visibility="visible"
         />
 

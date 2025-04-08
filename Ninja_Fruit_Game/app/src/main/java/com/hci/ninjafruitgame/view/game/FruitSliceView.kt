@@ -19,32 +19,33 @@ class FruitSliceView @JvmOverloads constructor(
     private var maxLen = 10 // độ dài tối đa của đường dao
     private var addWidth = 2f // độ rộng tăng thêm
 
-    private val pointFS: Deque<PointF> = ArrayDeque(maxLen) // mép trên đường dao
-    private val pointFSClose: Deque<PointF> = ArrayDeque(maxLen) // mép dưới đường dao
+    private val pointFSMap = mutableMapOf<Int, Deque<PointF>>()         // từng ngón
+    private val pointFSCloseMap = mutableMapOf<Int, Deque<PointF>>()    // khép kín dao cho từng ngón
 
     private val mPaint = Paint()
-    private var mShader: Shader? = null // hiệu ứng màu dao
+    private var mShader: Shader? = null
 
     private var isDiff = false
 
     private val diff = object : Runnable {
         override fun run() {
-            val pointF = pointFS.pollFirst()
-            val delayMillis = 25
-            if (pointF != null) {
-                postInvalidate()
-                postDelayed(this, delayMillis.toLong())
-                return
+            var hasPoint = false
+            for (deque in pointFSMap.values) {
+                if (deque.isNotEmpty()) {
+                    deque.pollFirst()
+                    hasPoint = true
+                }
             }
-
-            if (isDiff) {
-                postDelayed(this, delayMillis.toLong())
+            postInvalidate()
+            if (hasPoint || isDiff) {
+                postDelayed(this, 25)
             }
         }
     }
 
     private val clearP = Runnable {
-        pointFS.clear()
+        pointFSMap.clear()
+        pointFSCloseMap.clear()
         postInvalidate()
     }
 
@@ -84,57 +85,109 @@ class FruitSliceView @JvmOverloads constructor(
         super.onDetachedFromWindow()
     }
 
+    private val handSlices = mutableMapOf<Int, Deque<PointF>>() // handId: 1001 (left), 1002 (right)
+    private val maxHandPath = 10
+
+    fun registerHandSlice(handId: Int, x: Float, y: Float) {
+        val path = handSlices.getOrPut(handId) { ArrayDeque(maxLen) }
+        if (path.size >= maxLen) path.pollFirst()
+        path.addLast(PointF(x - outRect.left, y - outRect.top))
+
+        pointFSCloseMap.getOrPut(handId) { ArrayDeque(maxLen) }
+
+        postInvalidate()
+    }
+
+
+
     fun onTouch(event: MotionEvent) {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
+        val actionMasked = event.actionMasked
+        val pointerIndex = event.actionIndex
+        val pointerId = event.getPointerId(pointerIndex)
+
+        when (actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 isDiff = true
                 removeCallbacks(diff)
                 removeCallbacks(clearP)
                 postDelayed(diff, 80)
-                pointFS.clear()
-                pointFS.addLast(PointF(event.x - outRect.left, event.y - outRect.top))
-                postInvalidate()
+
+                pointFSMap[pointerId] = ArrayDeque(maxLen)
+                pointFSCloseMap[pointerId] = ArrayDeque(maxLen)
+                pointFSMap[pointerId]?.addLast(
+                    PointF(event.getX(pointerIndex) - outRect.left, event.getY(pointerIndex) - outRect.top)
+                )
             }
 
             MotionEvent.ACTION_MOVE -> {
-                onMove(event.x - outRect.left, event.y - outRect.top)
-                postInvalidate()
+                for (i in 0 until event.pointerCount) {
+                    val id = event.getPointerId(i)
+                    val x = event.getX(i) - outRect.left
+                    val y = event.getY(i) - outRect.top
+                    if (!pointFSMap.containsKey(id)) continue
+
+                    val deque = pointFSMap[id]!!
+                    if (deque.size >= maxLen - 1) deque.pollFirst()
+                    deque.addLast(PointF(x, y))
+                }
             }
 
-            MotionEvent.ACTION_UP -> {
-                isDiff = false
-                postDelayed(clearP, 400)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                pointFSMap.remove(pointerId)
+                pointFSCloseMap.remove(pointerId)
             }
         }
-    }
 
-    private fun onMove(x: Float, y: Float) {
-        if (pointFS.size >= maxLen - 1) {
-            pointFS.pollFirst()
-        }
-        pointFS.addLast(PointF(x, y))
+        postInvalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
-        val start = pointFS.peek() ?: return
+        for ((pointerId, pointFS) in pointFSMap) {
+            if (pointFS.isEmpty()) continue
 
-        val path = createPath()
+            val pointFSClose = pointFSCloseMap[pointerId] ?: continue
+            val path = createPath(pointFS, pointFSClose)
 
-        // Viền
-        mPaint.color = Color.BLACK
-        mPaint.strokeWidth = 1f
-        mPaint.style = Paint.Style.STROKE
-        mPaint.shader = null
-        canvas.drawPath(path, mPaint)
+            // Viền dao
+            mPaint.color = Color.BLACK
+            mPaint.strokeWidth = 1f
+            mPaint.style = Paint.Style.STROKE
+            mPaint.shader = null
+            canvas.drawPath(path, mPaint)
 
-        // Tô màu dao
-        mPaint.style = Paint.Style.FILL
-        mPaint.shader = mShader
-        canvas.drawPath(path, mPaint)
+            // Tô dao
+            mPaint.style = Paint.Style.FILL
+            mPaint.shader = mShader
+            canvas.drawPath(path, mPaint)
+        }
+
+        // Vẽ dao từ tay camera (hand)
+        for ((handId, pointFS) in handSlices) {
+            if (pointFS.isEmpty()) continue
+
+            val pointFSClose = pointFSCloseMap.getOrPut(handId) { ArrayDeque(maxLen) }
+            val path = createPath(pointFS, pointFSClose)
+
+            // Viền dao
+            mPaint.color = Color.BLACK
+            mPaint.strokeWidth = 1f
+            mPaint.style = Paint.Style.STROKE
+            mPaint.shader = null
+            canvas.drawPath(path, mPaint)
+
+            // Tô dao
+            mPaint.style = Paint.Style.FILL
+            mPaint.shader = mShader
+            canvas.drawPath(path, mPaint)
+        }
+
+
     }
 
-    private fun createPath(): Path {
+    private fun createPath(pointFS: Deque<PointF>, pointFSClose: Deque<PointF>): Path {
         val start = pointFS.peek() ?: return Path().apply { moveTo(0f, 0f) }
+
+        pointFSClose.clear()
 
         val path = Path()
         path.moveTo(start.x, start.y)
@@ -166,26 +219,12 @@ class FruitSliceView @JvmOverloads constructor(
             width += addWidth.toInt()
         }
 
-        while (pointFSClose.peekFirst() != null) {
+        while (pointFSClose.isNotEmpty()) {
             val pf = pointFSClose.pollFirst()
-            if (pf == null) break
-            path.lineTo(pf.x, pf.y)
+            if (pf != null) path.lineTo(pf.x, pf.y)
         }
 
         path.close()
         return path
     }
-
-    fun registerWristSlice(x: Float, y: Float) {
-        // xử lý giống như cảm ứng thường
-        onTouch(MotionEvent.obtain(
-            SystemClock.uptimeMillis(),
-            SystemClock.uptimeMillis(),
-            MotionEvent.ACTION_MOVE,
-            x,
-            y,
-            0
-        ))
-    }
-
 }
