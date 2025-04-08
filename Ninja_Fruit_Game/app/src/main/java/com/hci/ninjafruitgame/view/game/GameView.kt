@@ -277,8 +277,7 @@ class GameView @JvmOverloads constructor(
 
     private fun spawnFreeze() {
         if (Random.nextFloat() > 0.25f) return // Hiếm hơn
-
-        val startX = Random.nextInt(100, width - 200).toFloat()
+        val startX = Random.nextInt(100, maxOf(101, width - 200)).toFloat()
         val screenMid = width / 2f
         val xVelocity = when {
             startX < screenMid - 100 -> Random.nextFloat() * 5f + 1f

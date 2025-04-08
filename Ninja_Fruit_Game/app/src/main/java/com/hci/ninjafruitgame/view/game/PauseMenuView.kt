@@ -359,8 +359,7 @@ class PauseMenuView @JvmOverloads constructor(
                 onToggleMute?.invoke(isMuted)
             }
             cameraRect.contains(x, y) -> {
-                isUsedCamera = !isUsedCamera
-                onToggleCameraBackground?.invoke(isUsedCamera)
+                updateCameraBackground(!isUsedCamera)
             }
             handRect.contains(x, y) -> {
                 isUsedHand = !isUsedHand
@@ -407,6 +406,11 @@ class PauseMenuView @JvmOverloads constructor(
                 }
             }
         }
+    }
+
+    fun updateCameraBackground(bool: Boolean) {
+        isUsedCamera = bool
+        onToggleCameraBackground?.invoke(isUsedCamera)
     }
 
     private fun emitParticles(x: Float, y: Float) {

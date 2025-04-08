@@ -182,7 +182,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-// And modify your hand detection toggle:
         pauseMenu.onToggleHandDetection = { enabled ->
             handDetectionEnabled = enabled
             gameView.setHandDetection(enabled)
@@ -194,6 +193,7 @@ class MainActivity : AppCompatActivity() {
                 createCameraSource()
                 startCameraSource()
                 Toast.makeText(applicationContext, "Hand detection enabled", Toast.LENGTH_SHORT).show()
+                pauseMenu.updateCameraBackground(true)
             } else {
                 pauseMenu.hideCameraBackground()
                 gameView.removeBackground(false)
@@ -299,9 +299,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (handDetectionEnabled && !pauseMenu.isVisible) {
-            return true
-        }
+//        if (handDetectionEnabled && !pauseMenu.isVisible) {
+//            return true
+//        }
 
         if (!gameView.getIsPaused() || (gameView.getIsPaused() && !isGameStarted)) {
             fruitSliceView.onTouch(ev) // hiển thị hiệu ứng dao

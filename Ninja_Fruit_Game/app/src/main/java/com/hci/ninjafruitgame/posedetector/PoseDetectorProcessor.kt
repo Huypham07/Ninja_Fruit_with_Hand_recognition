@@ -71,16 +71,21 @@ class PoseDetectorProcessor(
     val leftIndex = pose.getPoseLandmark(PoseLandmark.LEFT_INDEX)
     val rightIndex = pose.getPoseLandmark(PoseLandmark.RIGHT_INDEX)
 
+    val MIN_CONFIDENCE = 0.7f // Ngưỡng độ tin cậy
+
     var leftX: Float? = null
     var leftY: Float? = null
     var rightX: Float? = null
     var rightY: Float? = null
 
-    if (leftIndex != null) {
+    // Chỉ truyền left nếu độ tin cậy đủ cao
+    if (leftIndex != null && leftIndex.inFrameLikelihood >= MIN_CONFIDENCE) {
       leftX = graphicOverlay.translateXRaw(leftIndex.position.x)
       leftY = graphicOverlay.translateYRaw(leftIndex.position.y)
     }
-    if (rightIndex != null) {
+
+    // Chỉ truyền right nếu độ tin cậy đủ cao
+    if (rightIndex != null && rightIndex.inFrameLikelihood >= MIN_CONFIDENCE) {
       rightX = graphicOverlay.translateXRaw(rightIndex.position.x)
       rightY = graphicOverlay.translateYRaw(rightIndex.position.y)
     }
