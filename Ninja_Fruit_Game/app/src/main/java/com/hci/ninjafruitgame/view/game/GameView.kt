@@ -3,23 +3,18 @@ package com.hci.ninjafruitgame.view.game
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
+import android.graphics.Bitmap
 import android.util.AttributeSet
-import android.util.Log
 import android.view.Choreographer
 import android.view.View
-import com.hci.ninjafruitgame.model.Fruit
+import com.hci.ninjafruitgame.model.GameObject
 import com.hci.ninjafruitgame.R
-import com.hci.ninjafruitgame.model.Bomb
 import com.hci.ninjafruitgame.model.GameObjectType
 import com.hci.ninjafruitgame.model.SlicedPiece
 import kotlin.random.Random
 import androidx.core.content.edit
-import androidx.core.graphics.toColorInt
 import com.hci.ninjafruitgame.utils.SoundManager
-import kotlin.concurrent.timerTask
-import kotlin.math.pow
 import kotlin.math.sqrt
-import java.util.Timer
 
 class GameView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -30,7 +25,7 @@ class GameView @JvmOverloads constructor(
     private var backgroundBitmap: Bitmap =
         BitmapFactory.decodeResource(resources, R.drawable.bg1)
 
-    private val fruits = mutableListOf<Fruit>()
+    private val fruits = mutableListOf<GameObject>()
     private val particles = mutableListOf<Particle>()
     private val fruitBitmaps = listOf(
         BitmapFactory.decodeResource(resources, R.drawable.apple),
@@ -59,13 +54,29 @@ class GameView @JvmOverloads constructor(
         R.drawable.orange to Color.rgb(255, 165, 0) // Màu cam
     )
 
-    private val bombs = mutableListOf<Bomb>()
+    private val bombs = mutableListOf<GameObject>()
     private val bombBitmap = BitmapFactory.decodeResource(resources, R.drawable.bomb)
+    private val bombBitmapResIds = R.drawable.bomb
+
+    private val freezes = mutableListOf<GameObject>()
+    private val freezeBitmap = BitmapFactory.decodeResource(resources, R.drawable.freeze_fruit)
+    private val freezeBitmapResId = R.drawable.freeze_fruit
+
+    private var isFreezeActive = false
+    private var freezeStartTime = 0L
+    private val freezeDuration = 10000L // 10 giây
+    private val freezeOverlayBitmap = BitmapFactory.decodeResource(resources, R.drawable.freeze_bg)
 
     private var isPaused = false
     fun getIsPaused(): Boolean {
         return isPaused
     }
+
+    private var lives = 3
+    private val maxLives = 3
+    private val lifeBitmap: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.life)
+    private val lifeSize = 80
+    private val lifeMargin = 30
 
     private var isGameOver = false
     private var gameOverScale = 2.5f
@@ -119,6 +130,16 @@ class GameView @JvmOverloads constructor(
 
     private fun update() {
         if (isPaused || isGameOver) return
+
+        // Kiểm tra hiệu ứng freeze hết hạn
+        if (isFreezeActive && System.currentTimeMillis() - freezeStartTime > freezeDuration) {
+            isFreezeActive = false
+        }
+
+        // Tính toán tỉ lệ làm chậm
+        val speedFactor = if (isFreezeActive) 0.25f else 1f
+
+
         // Spawn fruit mỗi 1.2s
         spawnCounter++
         if (spawnCounter >= 75) {
@@ -126,8 +147,20 @@ class GameView @JvmOverloads constructor(
                 spawnFruit()
             }
             if (spawnCounter >= 300) {
+                spawnFreeze()
                 spawnBomb()
                 spawnCounter = 0
+            }
+        }
+
+        // Update Freeze
+        val fIter = freezes.iterator()
+        while (fIter.hasNext()) {
+            val freeze = fIter.next()
+            freeze.update(gravity, speedFactor)
+
+            if (freeze.position.y > height + 200) {
+                fIter.remove() // rơi xuống đáy
             }
         }
 
@@ -135,7 +168,7 @@ class GameView @JvmOverloads constructor(
         val iterator = fruits.iterator()
         while (iterator.hasNext()) {
             val fruit = iterator.next()
-            fruit.update(gravity)
+            fruit.update(gravity, speedFactor)
 
             if (fruit.position.y > height + 200) {
                 iterator.remove() // rơi xuống đáy
@@ -145,7 +178,7 @@ class GameView @JvmOverloads constructor(
         val bIter = bombs.iterator()
         while (bIter.hasNext()) {
             val bomb = bIter.next()
-            bomb.update(gravity)
+            bomb.update(gravity, speedFactor)
 
             if (bomb.position.y > height + 200) {
                 bIter.remove() // rơi xuống đáy
@@ -164,7 +197,7 @@ class GameView @JvmOverloads constructor(
         val iter = slicedPieces.iterator()
         while (iter.hasNext()) {
             val piece = iter.next()
-            piece.update(gravity)
+            piece.update(gravity, speedFactor)
             if (piece.position.y > height + 200) {
                 iter.remove()
             }
@@ -194,25 +227,28 @@ class GameView @JvmOverloads constructor(
         val minHeight = height / 2f + bitmap.height / 2f
         val maxHeight = height.toFloat() - bitmap.height / 2f
 
-        val gravityAdjusted = gravity // dùng đúng gravity đang dùng ở game
         val targetHeight = Random.nextFloat() * (maxHeight - minHeight) + minHeight
-        val yVelocity = -kotlin.math.sqrt(2 * gravityAdjusted * targetHeight) * 1.0f
+        val yVelocity = -sqrt(2 * gravity * targetHeight) * 1.0f
 
         if (type == GameObjectType.TYPE_FRUIT.value) {
-            val fruit = Fruit(
+            val fruit = GameObject(
                 bitmap = bitmap,
                 bitmapResId = fruitResId,
                 position = PointF(startX, height.toFloat()),
                 velocity = PointF(xVelocity, yVelocity),
-                rotationSpeed = Random.nextFloat() * 8f - 4f
+                rotationSpeed = Random.nextFloat() * 8f - 4f,
+                type = GameObjectType.TYPE_FRUIT.value
             )
 
             fruits.add(fruit)
         } else if (type == GameObjectType.TYPE_BOMB.value) {
-            val bomb = Bomb(
-                bitmap = bitmap, position = PointF(startX, height.toFloat()),
+            val bomb = GameObject(
+                bitmap = bitmap,
+                bitmapResId = bombBitmapResIds,
+                position = PointF(startX, height.toFloat()),
                 velocity = PointF(xVelocity, yVelocity),
-                rotationSpeed = Random.nextFloat() * 8f - 4f
+                rotationSpeed = Random.nextFloat() * 8f - 4f,
+                type = GameObjectType.TYPE_BOMB.value
             )
 
             bombs.add(bomb)
@@ -238,6 +274,34 @@ class GameView @JvmOverloads constructor(
             spawnSingle(GameObjectType.TYPE_BOMB.value)
         }
     }
+
+    private fun spawnFreeze() {
+        if (Random.nextFloat() > 0.25f) return // Hiếm hơn
+
+        val startX = Random.nextInt(100, width - 200).toFloat()
+        val screenMid = width / 2f
+        val xVelocity = when {
+            startX < screenMid - 100 -> Random.nextFloat() * 5f + 1f
+            startX > screenMid + 100 -> -Random.nextFloat() * 5f - 1f
+            else -> Random.nextFloat() * 2f - 1f
+        }
+
+        val minHeight = height / 2f + freezeBitmap.height / 2f
+        val maxHeight = height.toFloat() - freezeBitmap.height / 2f
+        val targetHeight = Random.nextFloat() * (maxHeight - minHeight) + minHeight
+        val yVelocity = -sqrt(2 * gravity * targetHeight)
+
+        val freeze = GameObject(
+            bitmap = freezeBitmap,
+            bitmapResId = freezeBitmapResId,
+            position = PointF(startX, height.toFloat()),
+            velocity = PointF(xVelocity, yVelocity),
+            rotationSpeed = Random.nextFloat() * 8f - 4f,
+            type = GameObjectType.TYPE_FREEZE.value
+        )
+        freezes.add(freeze)
+    }
+
 
     private val leftIndexFillPaint = Paint().apply {
         color = Color.WHITE
@@ -275,12 +339,18 @@ class GameView @JvmOverloads constructor(
             canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
         }
 
+        freezes.forEach { it.draw(canvas) }
+
         splashMarks.forEach { it.draw(canvas, paint) }
         fruits.forEach { it.draw(canvas) }
         bombs.forEach { it.draw(canvas) }
         slicedPieces.forEach { it.draw(canvas) }
         particles.forEach { it.draw(canvas, paint) }
         scorePops.forEach { it.draw(canvas, scorePopTextPaint) }
+
+        if (isFreezeActive) {
+            canvas.drawBitmap(freezeOverlayBitmap, null, Rect(0, 0, width, height), null)
+        }
 
         if (useHandDetection) {
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
@@ -290,6 +360,7 @@ class GameView @JvmOverloads constructor(
         }
 
         drawScore(canvas)
+        drawLives(canvas)
 
         if (isGameOver) {
             val overlayPaint = Paint().apply {
@@ -315,6 +386,20 @@ class GameView @JvmOverloads constructor(
             invalidate() // Để giữ cho animation chạy
         }
     }
+
+    private fun drawLives(canvas: Canvas) {
+        for (i in 0 until lives) {
+            val left = width - (i + 1) * (lifeSize + lifeMargin)
+            val top = lifeMargin
+            canvas.drawBitmap(
+                Bitmap.createScaledBitmap(lifeBitmap, lifeSize, lifeSize, false),
+                left.toFloat(),
+                top.toFloat(),
+                null
+            )
+        }
+    }
+
 
     override fun onSliceAt(x: Float, y: Float) {
         sliceAt(x, y)
@@ -402,10 +487,38 @@ class GameView @JvmOverloads constructor(
                 val hitRadius = bomb.bitmap.width * 0.6f
                 if (distance < hitRadius) {
                     SoundManager.playSliceBomb()
-                    triggerGameOver()
+                    lives--
+                    if (lives <= 0) {
+                        triggerGameOver()
+                    } else {
+                        bomb.isSliced = true
+                    }
                 }
             }
         }
+
+        freezes.forEach { freeze ->
+            if (!freeze.isSliced) {
+                val centerX = freeze.position.x + freeze.bitmap.width / 2f
+                val centerY = freeze.position.y + freeze.bitmap.height / 2f
+                val dx = x - centerX
+                val dy = y - centerY
+                val distance = sqrt(dx * dx + dy * dy)
+
+                val hitRadius = freeze.bitmap.width * 0.6f
+                if (distance < hitRadius) {
+                    freeze.isSliced = true
+
+                    isFreezeActive = true
+                    freezeStartTime = System.currentTimeMillis()
+
+                    emitParticles(centerX, centerY, Color.CYAN)
+                    SoundManager.playSlice()
+                }
+            }
+        }
+
+
     }
 
     private fun triggerGameOver() {
@@ -518,6 +631,7 @@ class GameView @JvmOverloads constructor(
 
         // Reset điểm
         currentScore = 0
+        lives = maxLives
 
         // Reset trạng thái
         isPaused = false

@@ -11,11 +11,11 @@ data class SlicedPiece(
     var rotation: Float = 0f,
     var rotationSpeed: Float = 0f
 ) {
-    fun update(gravity: Float) {
-        position.x += velocity.x
-        position.y += velocity.y
-        velocity.y += gravity
-        rotation += rotationSpeed
+    fun update(gravity: Float, speedFactor: Float = 1f) {
+            position.x += velocity.x * speedFactor
+            position.y += velocity.y * speedFactor
+            velocity.y += gravity * speedFactor
+            rotation += rotationSpeed * speedFactor
     }
 
     fun draw(canvas: Canvas) {
