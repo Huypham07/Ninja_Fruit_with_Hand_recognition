@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
+import android.util.Log
 import android.view.Choreographer
 import android.view.View
 import com.hci.ninjafruitgame.model.Fruit
@@ -13,6 +14,12 @@ import com.hci.ninjafruitgame.model.GameObjectType
 import com.hci.ninjafruitgame.model.SlicedPiece
 import kotlin.random.Random
 import androidx.core.content.edit
+import androidx.core.graphics.toColorInt
+import com.hci.ninjafruitgame.utils.SoundManager
+import kotlin.concurrent.timerTask
+import kotlin.math.pow
+import kotlin.math.sqrt
+import java.util.Timer
 
 class GameView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -60,6 +67,18 @@ class GameView @JvmOverloads constructor(
         return isPaused
     }
 
+    private var isGameOver = false
+    private var gameOverScale = 2.5f
+    private var scaleDirection = -1
+    private var gameOverBitmap = BitmapFactory.decodeResource(resources, R.drawable.gameover)
+    private var scorePaint = Paint().apply {
+        color = Color.YELLOW
+        textAlign = Paint.Align.CENTER
+        textSize = 80f
+        isAntiAlias = true
+    }
+
+
     private var currentScore = 0
     private val prefs = context.getSharedPreferences("game_prefs", Context.MODE_PRIVATE)
     private var bestScore = prefs.getInt("best_score", 0)
@@ -99,7 +118,7 @@ class GameView @JvmOverloads constructor(
 
 
     private fun update() {
-        if (isPaused) return
+        if (isPaused || isGameOver) return
         // Spawn fruit mỗi 1.2s
         spawnCounter++
         if (spawnCounter >= 75) {
@@ -264,13 +283,37 @@ class GameView @JvmOverloads constructor(
         scorePops.forEach { it.draw(canvas, scorePopTextPaint) }
 
         if (useHandDetection) {
-            canvas.drawCircle(leftHandX, leftHandY, 50f, leftIndexFillPaint)
-            canvas.drawCircle(leftHandX, leftHandY, 50f, leftIndexStrokePaint)
-            canvas.drawCircle(rightHandX, rightHandY, 50f, rightIndexFillPaint)
-            canvas.drawCircle(rightHandX, rightHandY, 50f, rightIndexStrokePaint)
+            canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
+            canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
+            canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
+            canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexStrokePaint)
         }
 
         drawScore(canvas)
+
+        if (isGameOver) {
+            val overlayPaint = Paint().apply {
+                color = Color.argb((0.6f * 255).toInt(), 0, 0, 0)
+            }
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
+            gameOverScale += scaleDirection * 0.01f
+            if (gameOverScale <= 1f) {
+                gameOverScale = 1f
+                scaleDirection = 1
+            } else if (gameOverScale >= 1.25f) {
+                gameOverScale = 1.25f
+                scaleDirection = -1
+            }
+
+            canvas.save()
+            canvas.scale(gameOverScale, gameOverScale, width / 2f, height / 2f - 50f)
+            canvas.drawBitmap(gameOverBitmap, width / 2f - gameOverBitmap.width / 2f, height / 2f - gameOverBitmap.height / 2f, null)
+            canvas.restore()
+
+            canvas.drawText("Score: $currentScore", width / 2f, height / 2f + gameOverBitmap.height, scorePaint)
+
+            invalidate() // Để giữ cho animation chạy
+        }
     }
 
     override fun onSliceAt(x: Float, y: Float) {
@@ -285,7 +328,7 @@ class GameView @JvmOverloads constructor(
                 val centerY = fruit.position.y + fruit.bitmap.height / 2f
                 val dx = x - centerX
                 val dy = y - centerY
-                val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+                val distance = sqrt(dx * dx + dy * dy)
 
                 val hitRadius = fruit.bitmap.width * 0.6f
                 if (distance < hitRadius) {
@@ -343,9 +386,33 @@ class GameView @JvmOverloads constructor(
 
                     slicedPieces.add(leftPiece)
                     slicedPieces.add(rightPiece)
+                    SoundManager.playSlice()
                 }
             }
         }
+
+        bombs.forEach { bomb ->
+            if (!bomb.isSliced) {
+                val centerX = bomb.position.x + bomb.bitmap.width / 2f
+                val centerY = bomb.position.y + bomb.bitmap.height / 2f
+                val dx = x - centerX
+                val dy = y - centerY
+                val distance = sqrt(dx * dx + dy * dy)
+
+                val hitRadius = bomb.bitmap.width * 0.6f
+                if (distance < hitRadius) {
+                    SoundManager.playSliceBomb()
+                    triggerGameOver()
+                }
+            }
+        }
+    }
+
+    private fun triggerGameOver() {
+        isGameOver = true
+        invalidate()
+
+        onGameOver?.invoke()
     }
 
     @SuppressLint("DiscouragedApi")
@@ -440,12 +507,14 @@ class GameView @JvmOverloads constructor(
     }
 
     fun resetGame() {
+        isGameOver = false
         // Reset tất cả danh sách
         fruits.clear()
         slicedPieces.clear()
         particles.clear()
         splashMarks.clear()
         scorePops.clear()
+        bombs.clear()
 
         // Reset điểm
         currentScore = 0
@@ -468,6 +537,12 @@ class GameView @JvmOverloads constructor(
 
     fun setOnPauseRequestedListener(listener: () -> Unit) {
         pauseRequested = listener
+    }
+
+    private var onGameOver: (() -> Unit)? = null
+
+    fun setOnGameOverListener(listener: () -> Unit) {
+        onGameOver = listener
     }
 
     private var leftHandX = 0f

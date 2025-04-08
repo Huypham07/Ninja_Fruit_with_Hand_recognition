@@ -13,6 +13,7 @@ import com.hci.ninjafruitgame.R
 import kotlin.random.Random
 import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withTranslation
+import com.hci.ninjafruitgame.utils.SoundManager
 
 class PauseMenuView @JvmOverloads constructor(
     context: Context,
@@ -242,7 +243,7 @@ class PauseMenuView @JvmOverloads constructor(
         handRect.set(icon2XLeft, bgY + scaledHeight / 2 + 260f - iconSize, icon2XRight, bgY + scaledHeight / 2 + 260f)
 
         canvas.drawBitmap(if (isUsedCamera) cameraBitmap else cameraLockBitmap, null, cameraRect, paint)
-        canvas.drawBitmap(if (isUsedCamera) handBitmap else handLockBitmap, null, handRect, paint)
+        canvas.drawBitmap(if (isUsedHand) handBitmap else handLockBitmap, null, handRect, paint)
 
         if (isGameStarted) {
             // Tính chiều rộng vùng bg_settings đã vẽ
@@ -313,10 +314,10 @@ class PauseMenuView @JvmOverloads constructor(
         canvas.drawText(useHandText, leftAlignX, bgY + scaledHeight / 2 + 240, paint)
 
         if (isUsedHand) {
-            canvas.drawCircle(leftHandX, leftHandY, 50f, leftIndexFillPaint)
-            canvas.drawCircle(leftHandX, leftHandY, 50f, leftIndexStrokePaint)
-            canvas.drawCircle(rightHandX, rightHandY, 50f, rightIndexFillPaint)
-            canvas.drawCircle(rightHandX, rightHandY, 50f, rightIndexStrokePaint)
+            canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
+            canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
+            canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
+            canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexStrokePaint)
         }
     }
 
@@ -375,6 +376,7 @@ class PauseMenuView @JvmOverloads constructor(
             if (distance < fruitBitmap.width * 0.6f) {
                 emitParticles(centerX, centerY)
                 addSplash(centerX, centerY)
+                SoundManager.playSlice()
                 isExiting = true
                 playExitAnimation {
                     onBackToStart?.invoke()
