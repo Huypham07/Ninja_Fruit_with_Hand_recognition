@@ -1,4 +1,4 @@
-name: Build Debug APK on Push
+name: Build Release APK on Push
 
 on:
   push:
@@ -19,16 +19,24 @@ jobs:
           distribution: "temurin"
           java-version: 17
 
+      - name: Decode keystore from secret
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > Ninja_Fruit_Game/keystore.jks
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
         working-directory: Ninja_Fruit_Game
 
-      - name: Build APK
-        run: ./gradlew assembleDebug
+      - name: Build signed release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
         working-directory: Ninja_Fruit_Game
 
-      - name: Upload debug APK as artifact
+      - name: Upload release APK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: Ninja_Fruit_Game/app/build/outputs/apk/debug/app-debug.apk
+          name: app-release
+          path: Ninja_Fruit_Game/app/build/outputs/apk/release/app-release.apk

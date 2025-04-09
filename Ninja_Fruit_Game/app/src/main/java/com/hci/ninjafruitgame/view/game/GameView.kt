@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.Bitmap
 import android.util.AttributeSet
+import android.util.Log
 import android.view.Choreographer
 import android.view.View
 import com.hci.ninjafruitgame.model.GameObject
@@ -13,6 +14,7 @@ import com.hci.ninjafruitgame.model.GameObjectType
 import com.hci.ninjafruitgame.model.SlicedPiece
 import kotlin.random.Random
 import androidx.core.content.edit
+import com.hci.ninjafruitgame.model.GameState as GS
 import com.hci.ninjafruitgame.utils.SoundManager
 import kotlin.math.sqrt
 
@@ -59,10 +61,6 @@ class GameView @JvmOverloads constructor(
 
     private val freezeBitmap = BitmapFactory.decodeResource(resources, R.drawable.freeze_fruit)
     private val freezeBitmapResId = R.drawable.freeze_fruit
-
-    private var isFreezeActive = false
-    private var freezeStartTime = 0L
-    private val freezeDuration = 10000L // 10 giây
     private val freezeOverlayBitmap = BitmapFactory.decodeResource(resources, R.drawable.freeze_bg)
 
     private val explodeBitmap = BitmapFactory.decodeResource(resources, R.drawable.explode)
@@ -71,22 +69,12 @@ class GameView @JvmOverloads constructor(
     private val guardBitmap = BitmapFactory.decodeResource(resources, R.drawable.guard)
     private val guardBitmapResId = R.drawable.guard
 
-    private var isGuard = false
-
-    private var isPaused = false
-    fun getIsPaused(): Boolean {
-        return isPaused
-    }
-
-    private var lives = 3
-    private val maxLives = 3
     private val lifeBitmap: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.life)
     private val lifeSize = 80
     private val lifeMargin = 30
 
     private val guardSize = 80
 
-    private var isGameOver = false
     private var gameOverScale = 2.5f
     private var scaleDirection = -1
     private var gameOverBitmap = BitmapFactory.decodeResource(resources, R.drawable.gameover)
@@ -97,12 +85,7 @@ class GameView @JvmOverloads constructor(
         isAntiAlias = true
     }
 
-
-    private var currentScore = 0
-    private val prefs = context.getSharedPreferences("game_prefs", Context.MODE_PRIVATE)
-    private var bestScore = prefs.getInt("best_score", 0)
     private val scoreIcon = BitmapFactory.decodeResource(resources, R.drawable.score)
-
     private val scorePops = mutableListOf<ScorePop>()
     private val slicedPieces = mutableListOf<SlicedPiece>()
     private val splashMarks = mutableListOf<SplashMark>()
@@ -110,17 +93,6 @@ class GameView @JvmOverloads constructor(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val gravity = 0.6f
     private var spawnCounter = 0
-
-    private var isRemovedBackground = false
-    private var useHandDetection = false
-
-    fun setHandDetection(enable: Boolean) {
-        useHandDetection = enable
-    }
-
-    fun removeBackground(remove: Boolean) {
-        isRemovedBackground = remove
-    }
 
     private val gameLoop = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
@@ -137,15 +109,15 @@ class GameView @JvmOverloads constructor(
 
 
     private fun update() {
-        if (isPaused || isGameOver) return
+        if (GS.isPaused() || GS.isGameOver()) return
 
         // Kiểm tra hiệu ứng freeze hết hạn
-        if (isFreezeActive && System.currentTimeMillis() - freezeStartTime > freezeDuration) {
-            isFreezeActive = false
+        if (GS.isFreeze() && System.currentTimeMillis() - GS.getFreezeStartTime() > GS.getFreezeDuration()) {
+            GS.setFreeze(freeze = false)
         }
 
         // Tính toán tỉ lệ làm chậm
-        val speedFactor = if (isFreezeActive) 0.25f else 1f
+        val speedFactor = if (GS.isFreeze()) 0.25f else 1f
 
 
         // Spawn fruit mỗi 1.2s
@@ -376,7 +348,7 @@ class GameView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        if (!isRemovedBackground) {
+        if (!GS.isUseCamera()) {
             canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
         }
 
@@ -387,11 +359,11 @@ class GameView @JvmOverloads constructor(
         particles.forEach { it.draw(canvas, paint) }
         scorePops.forEach { it.draw(canvas, scorePopTextPaint) }
 
-        if (isFreezeActive) {
+        if (GS.isFreeze()) {
             canvas.drawBitmap(freezeOverlayBitmap, null, Rect(0, 0, width, height), null)
         }
 
-        if (useHandDetection) {
+        if (GS.isUseHandTracker()) {
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
             canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
@@ -402,7 +374,7 @@ class GameView @JvmOverloads constructor(
         drawLives(canvas)
         drawGuard(canvas)
 
-        if (isGameOver) {
+        if (GS.isGameOver()) {
             val overlayPaint = Paint().apply {
                 color = Color.argb((0.6f * 255).toInt(), 0, 0, 0)
             }
@@ -421,14 +393,14 @@ class GameView @JvmOverloads constructor(
             canvas.drawBitmap(gameOverBitmap, width / 2f - gameOverBitmap.width / 2f, height / 2f - gameOverBitmap.height / 2f, null)
             canvas.restore()
 
-            canvas.drawText("Score: $currentScore", width / 2f, height / 2f + gameOverBitmap.height, scorePaint)
+            canvas.drawText("Score: ${GS.getScore()}", width / 2f, height / 2f + gameOverBitmap.height, scorePaint)
 
             invalidate() // Để giữ cho animation chạy
         }
     }
 
     private fun drawLives(canvas: Canvas) {
-        for (i in 0 until lives) {
+        for (i in 0 until GS.getLives()) {
             val left = width - (i + 1) * (lifeSize + lifeMargin)
             val top = lifeMargin
             canvas.drawBitmap(
@@ -441,7 +413,7 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun drawGuard(canvas: Canvas) {
-        if (isGuard) {
+        if (GS.isGuard()) {
             val left = width - 330
             val top = 140
             canvas.drawBitmap(
@@ -475,11 +447,12 @@ class GameView @JvmOverloads constructor(
                     when (gameObject.type) {
                         GameObjectType.TYPE_BOMB.value -> {
                             SoundManager.playSliceBomb()
-                            if (isGuard) {
-                                isGuard = false
+                            if (GS.isGuard()) {
+                                GS.setGuard(guard = false)
                             } else {
-                                lives--
-                                if (lives <= 0) {
+                                val updateLives = GS.getLives() - 1
+                                GS.setLives(updateLives)
+                                if (updateLives <= 0) {
                                     triggerGameOver()
                                 } else {
                                     gameObject.isSliced = true
@@ -526,7 +499,7 @@ class GameView @JvmOverloads constructor(
 
                     when (gameObject.type) {
                         GameObjectType.TYPE_FRUIT.value -> {
-                            currentScore++
+                            val currentScore = GS.getScore() + 1
                             scorePops.add(
                                 ScorePop(
                                     position = PointF(centerX + 30f, centerY), // gần điểm chém
@@ -534,9 +507,8 @@ class GameView @JvmOverloads constructor(
                                 )
                             )
 
-                            if (currentScore > bestScore) {
-                                bestScore = currentScore
-                                prefs.edit { putInt("best_score", bestScore) }
+                            if (currentScore > GS.getBestScore()) {
+                                GS.setBestScore(currentScore)
                             }
 
                             val fruitColor = fruitColorMap[gameObject.bitmapResId] ?: Color.WHITE
@@ -544,8 +516,8 @@ class GameView @JvmOverloads constructor(
                             addSplashMark(centerX, centerY, gameObject.bitmapResId)
                         }
                         GameObjectType.TYPE_FREEZE.value -> {
-                            isFreezeActive = true
-                            freezeStartTime = System.currentTimeMillis()
+                            GS.setFreeze(true)
+                            GS.setFreezeStartTime(System.currentTimeMillis())
 
                             emitParticles(centerX, centerY, Color.CYAN)
                         }
@@ -556,7 +528,7 @@ class GameView @JvmOverloads constructor(
                             explodeAll()
                         }
                         GameObjectType.TYPE_GUARD.value -> {
-                            isGuard = true
+                            GS.setGuard(true)
                         }
                     }
                 }
@@ -614,7 +586,7 @@ class GameView @JvmOverloads constructor(
 
                 when (gameObject.type) {
                     GameObjectType.TYPE_FRUIT.value -> {
-                        currentScore++
+                        val currentScore = GS.getScore() + 1
                         scorePops.add(
                             ScorePop(
                                 position = PointF(centerX + 30f, centerY), // gần điểm chém
@@ -622,9 +594,8 @@ class GameView @JvmOverloads constructor(
                             )
                         )
 
-                        if (currentScore > bestScore) {
-                            bestScore = currentScore
-                            prefs.edit { putInt("best_score", bestScore) }
+                        if (currentScore > GS.getBestScore()) {
+                            GS.setBestScore(currentScore)
                         }
 
                         val fruitColor = fruitColorMap[gameObject.bitmapResId] ?: Color.WHITE
@@ -632,8 +603,8 @@ class GameView @JvmOverloads constructor(
                         addSplashMark(centerX, centerY, gameObject.bitmapResId)
                     }
                     GameObjectType.TYPE_FREEZE.value -> {
-                        isFreezeActive = true
-                        freezeStartTime = System.currentTimeMillis()
+                        GS.setFreeze(true)
+                        GS.setFreezeStartTime(System.currentTimeMillis())
 
                         emitParticles(centerX, centerY, Color.CYAN)
                     }
@@ -644,7 +615,7 @@ class GameView @JvmOverloads constructor(
                         explodeAll()
                     }
                     GameObjectType.TYPE_GUARD.value -> {
-                        isGuard = true
+                        GS.setGuard(true)
                     }
                 }
             }
@@ -652,7 +623,7 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun triggerGameOver() {
-        isGameOver = true
+        GS.setGameOver(true)
         invalidate()
 
         onGameOver?.invoke()
@@ -732,26 +703,16 @@ class GameView @JvmOverloads constructor(
         val scoreY = iconY + scoreIcon.height * 0.75f
 
         // Vẽ điểm hiện tại với viền
-        canvas.drawText(currentScore.toString(), scoreX, scoreY, scoreStrokePaint)
-        canvas.drawText(currentScore.toString(), scoreX, scoreY, scoreTextPaint)
+        canvas.drawText(GS.getScore().toString(), scoreX, scoreY, scoreStrokePaint)
+        canvas.drawText(GS.getScore().toString(), scoreX, scoreY, scoreTextPaint)
 
         // Vị trí Best Score
         val bestY = scoreY + 70f
-        canvas.drawText("Best: $bestScore", iconX, bestY, bestStrokePaint)
-        canvas.drawText("Best: $bestScore", iconX, bestY, bestTextPaint)
-    }
-
-    fun pauseGame() {
-        isPaused = true
-    }
-
-    fun resumeGame() {
-        isPaused = false
+        canvas.drawText("Best: ${GS.getBestScore()}", iconX, bestY, bestStrokePaint)
+        canvas.drawText("Best: ${GS.getBestScore()}", iconX, bestY, bestTextPaint)
     }
 
     fun resetGame() {
-        isGameOver = false
-        isGuard = false
         // Reset tất cả danh sách
         gameObjects.clear()
         slicedPieces.clear()
@@ -759,16 +720,9 @@ class GameView @JvmOverloads constructor(
         splashMarks.clear()
         scorePops.clear()
 
-        // Reset điểm
-        currentScore = 0
-        lives = maxLives
-
-        // Reset trạng thái
-        isPaused = false
         spawnCounter = 0
 
-        // Reset background nếu cần (giữ nguyên hoặc về mặc định)
-        // backgroundBitmap = BitmapFactory.decodeResource(resources, R.drawable.bg)
+        GS.resetGame()
         invalidate()
     }
 

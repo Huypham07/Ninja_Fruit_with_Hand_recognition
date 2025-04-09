@@ -36,6 +36,14 @@ class FruitSliceView @JvmOverloads constructor(
                     hasPoint = true
                 }
             }
+
+            for (deque in handSlices.values) {
+                if (deque.isNotEmpty()) {
+                    deque.pollFirst()
+                    hasPoint = true
+                }
+            }
+
             postInvalidate()
             if (hasPoint || isDiff) {
                 postDelayed(this, 25)
@@ -94,7 +102,8 @@ class FruitSliceView @JvmOverloads constructor(
         path.addLast(PointF(x - outRect.left, y - outRect.top))
 
         pointFSCloseMap.getOrPut(handId) { ArrayDeque(maxLen) }
-
+        removeCallbacks(diff)
+        postDelayed(diff, 80)
         postInvalidate()
     }
 
