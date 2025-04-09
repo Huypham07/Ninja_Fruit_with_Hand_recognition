@@ -1,4 +1,4 @@
-name: Build Release APK on Push
+name: Build & Release Signed APK on Push to Main
 
 on:
   push:
@@ -35,8 +35,27 @@ jobs:
         run: ./gradlew assembleRelease
         working-directory: Ninja_Fruit_Game
 
-      - name: Upload release APK as artifact
-        uses: actions/upload-artifact@v4
+      - name: Get version from build.gradle
+        id: version
+        run: |
+          VERSION_NAME=$(grep versionName Ninja_Fruit_Game/app/build.gradle | grep -oP '"\K[^"]+')
+          echo "version=$VERSION_NAME"
+          echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: app-release
-          path: Ninja_Fruit_Game/app/build/outputs/apk/release/app-release.apk
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          files: Ninja_Fruit_Game/app/build/outputs/apk/release/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
