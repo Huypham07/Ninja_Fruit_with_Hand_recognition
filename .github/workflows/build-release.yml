@@ -1,12 +1,15 @@
-name: Build & Release Signed APK on Push to Main
+name: Build & Release Signed APK
 
 on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
 
 jobs:
   build:
+    if: startsWith(github.ref, 'refs/tags/') && github.event.base_ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -35,18 +38,11 @@ jobs:
         run: ./gradlew assembleRelease
         working-directory: Ninja_Fruit_Game
 
-      - name: Get version from build.gradle
-        id: version
-        run: |
-          VERSION_NAME=$(grep versionName Ninja_Fruit_Game/app/build.gradle | grep -oP '"\K[^"]+')
-          echo "version=$VERSION_NAME"
-          echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release v${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          name: Ninja Fruit v${{ github.ref_name }}
           draft: false
           prerelease: false
         env:
@@ -55,7 +51,7 @@ jobs:
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
           files: Ninja_Fruit_Game/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
