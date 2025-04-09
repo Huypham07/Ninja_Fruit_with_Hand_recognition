@@ -14,6 +14,7 @@ import kotlin.random.Random
 import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withTranslation
 import com.hci.ninjafruitgame.utils.SoundManager
+import com.hci.ninjafruitgame.model.GameState as GS
 
 class PauseMenuView @JvmOverloads constructor(
     context: Context,
@@ -70,28 +71,15 @@ class PauseMenuView @JvmOverloads constructor(
 
     private var currentBgIndex = 1
 
-    private var isGameStarted = false
     private var isExiting = false
 
     var onBackgroundChange: ((Int) -> Unit)? = null
     var onBackToStart: (() -> Unit)? = null
     var onResume: (() -> Unit)? = null
     var onRestart: (() -> Unit)? = null
-    var onToggleMute: ((Boolean) -> Unit)? = null
+    var onToggleMusicEnabled: ((Boolean) -> Unit)? = null
     var onToggleCameraBackground: ((Boolean) -> Unit)? = null
     var onToggleHandDetection: ((Boolean) -> Unit)? = null
-    fun hideCameraBackground() {
-        isUsedCamera = false
-    }
-
-    fun getIsMuted(): Boolean {
-        return isMuted
-    }
-
-    private var isUsedCamera = false
-    private var isUsedHand = false
-
-    private var isMuted = false
 
     private val introAnim = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 600
@@ -109,8 +97,7 @@ class PauseMenuView @JvmOverloads constructor(
         start()
     }
 
-    fun show(isGameStarted: Boolean) {
-        this.isGameStarted = isGameStarted
+    fun show() {
         visibility = VISIBLE
         introAnim.start()
         isExiting = false
@@ -202,7 +189,7 @@ class PauseMenuView @JvmOverloads constructor(
         val aspectRatio = bgBitmap.width.toFloat() / bgBitmap.height.toFloat()
         val scaledWidth = (scaledHeight * aspectRatio).toInt()
 
-        if (isGameStarted) {
+        if (GS.isGameStarted()) {
             val titleRect = RectF(
                 centerX - scaledWidth * 0.2f,
                 titleY,
@@ -235,17 +222,17 @@ class PauseMenuView @JvmOverloads constructor(
         val muteX = centerX - 120f - 200f - iconSize
         muteRect.set(muteX, icon1Y.toFloat(), muteX + iconSize, icon1Y + iconSize)
 
-        canvas.drawBitmap(if (isMuted) muteBitmap else unmuteBitmap, null, muteRect, paint)
+        canvas.drawBitmap(if (GS.isMusicEnabled()) unmuteBitmap else muteBitmap, null, muteRect, paint)
 
         val icon2XLeft = right - 140f - iconSize
         val icon2XRight = right - 140f
         cameraRect.set(icon2XLeft, bgY + scaledHeight / 2 + 140f - iconSize, icon2XRight, bgY + scaledHeight / 2 + 140f)
         handRect.set(icon2XLeft, bgY + scaledHeight / 2 + 260f - iconSize, icon2XRight, bgY + scaledHeight / 2 + 260f)
 
-        canvas.drawBitmap(if (isUsedCamera) cameraBitmap else cameraLockBitmap, null, cameraRect, paint)
-        canvas.drawBitmap(if (isUsedHand) handBitmap else handLockBitmap, null, handRect, paint)
+        canvas.drawBitmap(if (GS.isUseCamera()) cameraBitmap else cameraLockBitmap, null, cameraRect, paint)
+        canvas.drawBitmap(if (GS.isUseHandTracker()) handBitmap else handLockBitmap, null, handRect, paint)
 
-        if (isGameStarted) {
+        if (GS.isGameStarted()) {
             // Tính chiều rộng vùng bg_settings đã vẽ
             val totalButtonArea = (scaledWidth * 0.6).toInt()
 
@@ -307,13 +294,13 @@ class PauseMenuView @JvmOverloads constructor(
         paint.textSize = 48f
         paint.textAlign = Paint.Align.LEFT
         val leftAlignX = left + 140f
-        val useCameraBgText = if (isUsedCamera) "Use Camera as background" else "Use Camera as background (locked)"
+        val useCameraBgText = if (GS.isUseCamera()) "Use Camera as background" else "Use Camera as background (locked)"
         canvas.drawText(useCameraBgText, leftAlignX, bgY + scaledHeight / 2 + 120, paint)
 
-        val useHandText = if (isUsedHand) "Use Hand Detection" else "Use Hand Detection (locked)"
+        val useHandText = if (GS.isUseHandTracker()) "Use Hand Detection" else "Use Hand Detection (locked)"
         canvas.drawText(useHandText, leftAlignX, bgY + scaledHeight / 2 + 240, paint)
 
-        if (isUsedHand) {
+        if (GS.isUseHandTracker()) {
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
             canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
@@ -355,18 +342,19 @@ class PauseMenuView @JvmOverloads constructor(
                 debounceBgChange()
             }
             muteRect.contains(x, y) -> {
-                isMuted = !isMuted
-                onToggleMute?.invoke(isMuted)
+                val enable = !GS.isMusicEnabled()
+                onToggleMusicEnabled?.invoke(enable)
             }
             cameraRect.contains(x, y) -> {
-                updateCameraBackground(!isUsedCamera)
+                val isUsedCamera = !GS.isUseCamera()
+                onToggleCameraBackground?.invoke(isUsedCamera)
             }
             handRect.contains(x, y) -> {
-                isUsedHand = !isUsedHand
+                val isUsedHand = !GS.isUseHandTracker()
                 onToggleHandDetection?.invoke(isUsedHand)
             }
         }
-        if (!isGameStarted) {
+        if (!GS.isGameStarted()) {
             val centerX = 260f
             val centerY = 700f
             val dx = x - centerX
@@ -406,11 +394,6 @@ class PauseMenuView @JvmOverloads constructor(
                 }
             }
         }
-    }
-
-    fun updateCameraBackground(bool: Boolean) {
-        isUsedCamera = bool
-        onToggleCameraBackground?.invoke(isUsedCamera)
     }
 
     private fun emitParticles(x: Float, y: Float) {

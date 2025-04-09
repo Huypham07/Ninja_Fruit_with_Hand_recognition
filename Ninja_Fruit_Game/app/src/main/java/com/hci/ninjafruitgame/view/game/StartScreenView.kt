@@ -14,6 +14,7 @@ import com.hci.ninjafruitgame.R
 import kotlin.random.Random
 import androidx.core.graphics.withTranslation
 import com.hci.ninjafruitgame.utils.SoundManager
+import com.hci.ninjafruitgame.model.GameState as GS
 
 
 class StartScreenView @JvmOverloads constructor(
@@ -57,18 +58,6 @@ class StartScreenView @JvmOverloads constructor(
     private val shiftY = 100f
 
     private val largeShiftY = 250f
-
-    private var isRemovedBackground = false
-
-    fun removeBackground(remove: Boolean) {
-        isRemovedBackground = remove
-    }
-
-    private var useHandDetection = false
-
-    fun setHandDetection(enable: Boolean) {
-        useHandDetection = enable
-    }
 
     private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 800
@@ -177,7 +166,7 @@ class StartScreenView @JvmOverloads constructor(
     @SuppressLint("DrawAllocation")
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (!isRemovedBackground) {
+        if (!GS.isUseCamera()) {
             canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
         }
 
@@ -225,7 +214,7 @@ class StartScreenView @JvmOverloads constructor(
         splashMarks.forEach { it.draw(canvas, paint) }
         particles.forEach { it.draw(canvas, paint) }
 
-        if (useHandDetection) {
+        if (GS.isUseHandTracker()) {
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
             canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
