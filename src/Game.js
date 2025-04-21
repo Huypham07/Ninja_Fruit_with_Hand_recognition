@@ -129,7 +129,7 @@ function startGame(e) {
 function renderTimer() {
   if (gameState != GAME_PLAYING) return;
   timer += SPP.frameTime;
-  if (timer >= interval) {
+  if (timer >= interval && !isFrozen) {
     timer = 0;
     throwObject();
   }
@@ -197,6 +197,11 @@ function render() {
   requestAnimationFrame(render);
 
   bottomContext.clearRect(0, 0, gameWidth, gameHeight);
+
+
+  //   handtracking.tick();
+
+  // Render camera background nếu đang sử dụng
   renderCameraBackground();
   
   if (window.gameSettings.gamePaused) {
@@ -212,6 +217,18 @@ function render() {
   }
 
   // Render camera background nếu đang sử dụng
+
+  if (isFrozen) {
+    /*freezeTimer -= 1000; // Giảm thời gian đóng băng
+    if (freezeTimer <= 0) {
+      isFrozen = false; // Hết thời gian đóng băng
+      // Tiếp tục chuyển động cho tất cả các quả
+      fruitSystem.getParticles().forEach(fruit => {
+        fruit.velocity.reset(0, -(10 + Math.random() * 3)); // Khôi phục lại chuyển động của quả
+      });
+    }*/
+
+  }
 
   fruitSystem.render();
   bombSystem.render();
