@@ -31,7 +31,7 @@ android {
         getByName("release") {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
-        }
+        } 
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -43,6 +43,16 @@ android {
     buildFeatures {
         compose = true
     }
+    applicationVariants.all {
+    if (buildType.name == "release") {
+        outputs.all {
+            val outputImpl = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            val versionName = this@all.versionName
+            outputImpl.outputFileName = "Ninja-Fruit-v$versionName.apk"
+        }
+    }
+}
+
 }
 
 dependencies {
