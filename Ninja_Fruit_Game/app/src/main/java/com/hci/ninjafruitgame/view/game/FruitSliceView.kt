@@ -236,4 +236,10 @@ class FruitSliceView @JvmOverloads constructor(
         path.close()
         return path
     }
+
+    fun clearHandSlice(handId: Int) {
+        handSlices.remove(handId)
+        pointFSCloseMap.remove(handId)
+        postInvalidate()
+    }
 }

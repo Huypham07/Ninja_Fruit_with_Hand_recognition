@@ -4,25 +4,39 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-
-
     <com.hci.ninjafruitgame.view.vision.CameraSourcePreview
-        android:id="@+id/preview_view"
+        android:id="@+id/poseViewFinder"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:visibility="gone"/>
+        android:visibility="visible"/>
 
     <com.hci.ninjafruitgame.view.vision.GraphicOverlay
         android:id="@+id/graphic_overlay"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:visibility="gone"/>
-
-    <com.hci.ninjafruitgame.view.game.GameView
-        android:id="@+id/gameView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone"/>
+        android:visibility="visible"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:divider="@drawable/divider_vertical"
+        android:showDividers="middle"
+        >
+        <com.hci.ninjafruitgame.view.game.GameView
+            android:id="@+id/gameView"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:visibility="gone"/>
+        <com.hci.ninjafruitgame.view.game.GameView
+            android:id="@+id/gameView2"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:visibility="gone"/>
+
+    </LinearLayout>
 
     <com.hci.ninjafruitgame.view.game.StartScreenView
         android:id="@+id/startScreen"
@@ -36,7 +50,6 @@
         android:src="@drawable/pause"
         android:layout_gravity="top|end"
         android:layout_marginTop="50dp"
-        android:layout_marginRight="20dp"
         android:visibility="visible"
         />
 

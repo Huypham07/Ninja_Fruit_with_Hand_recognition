@@ -18,84 +18,87 @@ import android.view.WindowInsetsController
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.ExperimentalGetImage
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import com.hci.ninjafruitgame.view.game.CountdownOverlay
-import com.hci.ninjafruitgame.view.game.FruitSliceView
-import com.hci.ninjafruitgame.view.game.GameView
-import com.hci.ninjafruitgame.view.game.PauseMenuView
-import com.hci.ninjafruitgame.view.game.SliceEffectReceiver
-import com.hci.ninjafruitgame.view.game.StartScreenView
-import kotlin.system.exitProcess
 import androidx.core.view.isVisible
 import com.hci.ninjafruitgame.posedetector.HandLandmarkListener
 import com.hci.ninjafruitgame.posedetector.HandTracker
 import com.hci.ninjafruitgame.posedetector.PoseDetectorProcessor
 import com.hci.ninjafruitgame.preference.PreferenceUtils
 import com.hci.ninjafruitgame.utils.SoundManager
+import com.hci.ninjafruitgame.view.game.CountdownOverlay
+import com.hci.ninjafruitgame.view.game.FruitSliceView
+import com.hci.ninjafruitgame.view.game.GameView
+import com.hci.ninjafruitgame.view.game.PauseMenuView
+import com.hci.ninjafruitgame.view.game.SliceEffectReceiver
+import com.hci.ninjafruitgame.view.game.StartScreenView
 import com.hci.ninjafruitgame.view.vision.CameraSource
 import com.hci.ninjafruitgame.view.vision.CameraSourcePreview
 import com.hci.ninjafruitgame.view.vision.GraphicOverlay
 import java.io.IOException
-import java.util.ArrayList
+import kotlin.system.exitProcess
 import com.hci.ninjafruitgame.model.GameState as GS
 
 class MainActivity : AppCompatActivity() {
-    private var cameraSource: CameraSource? = null
-    private var preview: CameraSourcePreview? = null
-    private var graphicOverlay: GraphicOverlay? = null
+    private lateinit var cameraSource: CameraSource
+    private lateinit var poseViewFinder: CameraSourcePreview
+    private lateinit var graphicOverlay: GraphicOverlay
 
     private var mediaPlayer: MediaPlayer? = null
 
     private lateinit var fruitSliceView: FruitSliceView
     private lateinit var gameView: GameView
+    private lateinit var gameView2: GameView
     private lateinit var startScreen: StartScreenView
     private lateinit var countdownOverlay: CountdownOverlay
     private lateinit var pauseMenu: PauseMenuView
     private lateinit var btnPause: ImageView
 
+
+    @ExperimentalGetImage
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         enableFullScreen()
+        // Initialize our background executor
 
+        // Wait for the views to be properly laid out
         fruitSliceView = findViewById(R.id.view)
         gameView = findViewById(R.id.gameView)
+        gameView2 = findViewById(R.id.gameView2)
         startScreen = findViewById(R.id.startScreen)
         pauseMenu = findViewById(R.id.pauseMenuContent)
         countdownOverlay = findViewById(R.id.countdownOverlay)
         btnPause = findViewById(R.id.btnPause)
-
-        preview = findViewById(R.id.preview_view)
-        if (preview == null) {
-            Log.d(TAG, "Preview is null")
-        }
-
         graphicOverlay = findViewById(R.id.graphic_overlay)
-        if (graphicOverlay == null) {
-            Log.d(TAG, "graphicOverlay is null")
-        }
+        poseViewFinder = findViewById(R.id.poseViewFinder)
 
         PreferenceUtils.hideDetectionInfo(this)
+
         updatePauseMenuBackground()
 
         SoundManager.init(applicationContext)
         startMusic(applicationContext)
 
-
-
-        val bestScore = getSharedPreferences("game_prefs", Context.MODE_PRIVATE).getInt("best_score", 0)
-        GS.setBestScore(bestScore)
+        val bestScore =
+            getSharedPreferences("game_prefs", MODE_PRIVATE).getInt("best_score", 0)
+        GS.bestScore = bestScore
 
         startScreen.onStartGame = {
             startScreen.visibility = View.GONE
             gameView.visibility = View.VISIBLE
-            pauseMenu.visibility = View.GONE
             gameView.resetGame()
-            GS.setGameStarted(true)
+            if (GS.isVersusMode) {
+                gameView2.visibility = View.VISIBLE
+                gameView2.resetGame()
+            }
+            pauseMenu.visibility = View.GONE
+            GS.isGameStarted = true
+            GS.isPaused = false
             updatePauseMenuBackground()
         }
 
@@ -120,12 +123,17 @@ class MainActivity : AppCompatActivity() {
 
         pauseMenu.onResume = {
             btnPause.visibility = View.VISIBLE
-            if (GS.isGameStarted()) {
+            if (GS.isVersusMode) {
+                btnPause.x = gameView.width - btnPause.width / 2f
+            } else {
+                btnPause.x = gameView.width - btnPause.width - 80f
+            }
+            if (GS.isGameStarted) {
                 countdownOverlay.startCountdown {
-                    GS.setPaused(false)
+                    GS.isPaused = false
                 }
             } else {
-                GS.setPaused(false)
+                GS.isPaused = false
             }
         }
 
@@ -134,28 +142,37 @@ class MainActivity : AppCompatActivity() {
                 countdownOverlay.cancelCountdown()
             }
 
-            GS.setPaused(true)
+            GS.isPaused = true
             btnPause.visibility = View.GONE
             pauseMenu.show()
         }
 
         pauseMenu.onBackToStart = {
             gameView.resetGame()
-            GS.setPaused(true)
+            gameView2.resetGame()
+            GS.isPaused = true
+            GS.isVersusMode = false
             gameView.visibility = View.GONE
+            gameView2.visibility = View.GONE
             startScreen.show()
-            GS.setGameStarted(false)
+            GS.isGameStarted = false
             updatePauseMenuBackground()
         }
 
         pauseMenu.onRestart = {
             gameView.resetGame()
-            GS.setPaused(true)
+            gameView2.resetGame()
+            GS.isPaused = true
             countdownOverlay.startCountdown {
-                GS.setPaused(false)
-                GS.setGameStarted(true)
+                GS.isPaused = false
+                GS.isGameStarted = true
             }
             btnPause.visibility = View.VISIBLE
+            if (GS.isVersusMode) {
+                btnPause.x = gameView.width - btnPause.width / 2f
+            } else {
+                btnPause.x = gameView.width - btnPause.width - 80f
+            }
         }
 
         pauseMenu.onBackgroundChange = { index ->
@@ -169,33 +186,46 @@ class MainActivity : AppCompatActivity() {
                 else -> R.drawable.bg1
             }
             gameView.setBackground(resId)
+            gameView2.setBackground(resId)
             startScreen.setBackground(resId)
         }
 
         pauseMenu.onToggleCameraBackground = { enabled ->
-            if (GS.isUseHandTracker()) {
-                GS.setUseCamera(enabled)
+            if (GS.isUseHandTracker) {
+                GS.isUseCamera = enabled
             } else {
-                GS.setUseCamera(false)
-                Toast.makeText(applicationContext, "Enable hand detection to use this feature", Toast.LENGTH_SHORT).show()
+                GS.isUseCamera = false
+                Toast.makeText(
+                    applicationContext,
+                    "Enable hand detection to use this feature",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
 
         pauseMenu.onToggleHandDetection = { enabled ->
-            GS.setUseHandTracker(enabled)
-            GS.setUseCamera(enabled)
+            if (GS.isVersusMode) {
+                Toast.makeText(applicationContext, "Hand detection is not supported in Versus mode", Toast.LENGTH_SHORT)
+                    .show()
+            }
             if (enabled) {
-                graphicOverlay?.visibility = View.VISIBLE
-                preview?.visibility = View.VISIBLE
-
+                GS.isUseHandTracker = enabled
+                GS.isUseCamera = enabled
+                graphicOverlay.visibility = View.VISIBLE
+                poseViewFinder.visibility = View.VISIBLE
                 createCameraSource()
                 startCameraSource()
-                Toast.makeText(applicationContext, "Hand detection enabled", Toast.LENGTH_SHORT).show()
+                Toast.makeText(applicationContext, "Hand detection enabled", Toast.LENGTH_SHORT)
+                    .show()
             } else {
-                preview?.visibility = View.GONE
-                graphicOverlay?.visibility = View.GONE
-                cameraSource?.stop()
-                Toast.makeText(applicationContext, "Hand detection disabled", Toast.LENGTH_SHORT).show()
+                GS.isUseHandTracker = enabled
+                GS.isUseCamera = enabled
+                graphicOverlay.visibility = View.GONE
+                poseViewFinder.visibility = View.GONE
+                cameraSource.stop()
+
+                Toast.makeText(applicationContext, "Hand detection disabled", Toast.LENGTH_SHORT)
+                    .show()
             }
         }
 
@@ -208,20 +238,51 @@ class MainActivity : AppCompatActivity() {
                 countdownOverlay.cancelCountdown()
             }
 
-            GS.setPaused(paused = true)
+            GS.isPaused = true
             pauseMenu.visibility = View.VISIBLE
         }
 
         gameView.setOnGameOverListener {
-            btnPause.visibility = View.GONE
-            Handler(Looper.getMainLooper()).postDelayed({
-                gameView.resetGame()
-                GS.setPaused(paused = true)
-                gameView.visibility = View.GONE
-                startScreen.show()
-                updatePauseMenuBackground()
-            }, 4000)
+            GS.p1GameOver = true
+            if (GS.isEndGame) {
+                btnPause.visibility = View.GONE
+                Handler(Looper.getMainLooper()).postDelayed({
+                    gameView.resetGame()
+                    gameView2.resetGame()
+                    GS.isPaused = true
+                    GS.isVersusMode = false
+                    gameView.visibility = View.GONE
+                    gameView2.visibility = View.GONE
+                    startScreen.show()
+                    GS.isGameStarted = false
+                    updatePauseMenuBackground()
+                }, 4000)
+            }
+        }
 
+        gameView2.setOnPauseRequestedListener {
+            if (countdownOverlay.isVisible) {
+                countdownOverlay.cancelCountdown()
+            }
+
+            GS.isPaused = true
+            pauseMenu.visibility = View.VISIBLE
+        }
+
+        gameView2.setOnGameOverListener {
+            GS.p2GameOver = true
+            if (GS.isEndGame) {
+                btnPause.visibility = View.GONE
+                Handler(Looper.getMainLooper()).postDelayed({
+                    gameView.resetGame()
+                    gameView2.resetGame()
+                    GS.isPaused = true
+                    gameView.visibility = View.GONE
+                    gameView2.visibility = View.GONE
+                    startScreen.show()
+                    updatePauseMenuBackground()
+                }, 4000)
+            }
         }
 
         if (!allRuntimePermissionsGranted()) {
@@ -235,68 +296,67 @@ class MainActivity : AppCompatActivity() {
      * again when the camera source is created.
      */
     private fun startCameraSource() {
-        if (cameraSource != null) {
             try {
-                if (preview == null) {
-                    Log.d(TAG, "resume: Preview is null")
-                }
-                if (graphicOverlay == null) {
-                    Log.d(TAG, "resume: graphOverlay is null")
-                }
-                preview!!.start(cameraSource, graphicOverlay)
+                poseViewFinder.start(cameraSource, graphicOverlay)
             } catch (e: IOException) {
                 Log.e(TAG, "Unable to start camera source.", e)
-                cameraSource!!.release()
-                cameraSource = null
+                cameraSource.release()
             }
-        }
     }
 
     /** Stops the camera. */
     override fun onPause() {
         super.onPause()
-        if (GS.isUseHandTracker()) {
-            preview?.stop()
-        }
-        if (GS.isMusicEnabled()) {
+        if (GS.isMusicEnabled) {
             mediaPlayer?.pause()
+        }
+        if (GS.isUseHandTracker) {
+            poseViewFinder.stop()
         }
     }
 
     public override fun onResume() {
         super.onResume()
-        if (GS.isUseHandTracker()) {
+        if (GS.isMusicEnabled) {
+            mediaPlayer?.start()
+        }
+        if (GS.isUseHandTracker) {
             createCameraSource()
             startCameraSource()
-        }
-        if (GS.isMusicEnabled()) {
-            mediaPlayer?.start()
         }
     }
 
     public override fun onDestroy() {
         super.onDestroy()
-        if (cameraSource != null) {
-            cameraSource?.release()
+            cameraSource.release()
+        getSharedPreferences("game_prefs", MODE_PRIVATE).edit {
+            putInt(
+                "best_score",
+                GS.bestScore
+            )
         }
-        getSharedPreferences("game_prefs", Context.MODE_PRIVATE).edit { putInt("best_score", GS.getBestScore()) }
     }
 
 
     private fun updatePauseMenuBackground() {
-        if (GS.isGameStarted()) {
+        if (GS.isGameStarted) {
             btnPause.visibility = View.VISIBLE
+            if (GS.isVersusMode) {
+                btnPause.post {
+                    btnPause.x = resources.displayMetrics.widthPixels / 2 - btnPause.width / 2f
+                }
+            } else {
+                btnPause.post {
+                    btnPause.x = resources.displayMetrics.widthPixels - btnPause.width - 80f
+                }
+            }
         } else {
             btnPause.visibility = View.GONE
         }
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-//        if (handDetectionEnabled && !pauseMenu.isVisible) {
-//            return true
-//        }
-
-        if (!GS.isPaused() || (GS.isPaused() && !GS.isGameStarted())) {
+        if (!GS.isPaused || (GS.isPaused && !GS.isGameStarted)) {
             fruitSliceView.onTouch(ev) // hiển thị hiệu ứng dao
         }
         if (
@@ -305,13 +365,19 @@ class MainActivity : AppCompatActivity() {
             ev.actionMasked == MotionEvent.ACTION_POINTER_DOWN
         ) {
             for (i in 0 until ev.pointerCount) {
-                val x = ev.getX(i)
+                var x = ev.getX(i)
                 val y = ev.getY(i)
 
                 val receiver: SliceEffectReceiver = when {
                     pauseMenu.isVisible -> pauseMenu
-                    !GS.isGameStarted() -> startScreen
-                    !GS.isPaused() -> gameView
+                    !GS.isGameStarted -> startScreen
+                    !GS.isPaused -> {
+                        if (x < gameView.width) gameView else {
+                            x -= gameView.width
+                            gameView2
+                        }
+                    }
+
                     else -> continue
                 }
 
@@ -326,9 +392,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun createCameraSource() {
         // If there's no existing cameraSource, create one.
-        if (cameraSource == null) {
+
             cameraSource = CameraSource(this, graphicOverlay)
-        }
+
         try {
             val poseDetectorOptions = PreferenceUtils.getPoseDetectorOptionsForLivePreview(this)
             Log.i(TAG, "Using Pose Detector with options $poseDetectorOptions")
@@ -353,27 +419,27 @@ class MainActivity : AppCompatActivity() {
                         x: Float?,
                         y: Float?
                     ) {
-                        if (x == null || y == null) return
+                        val posX = x ?: -200f
+                        val posY = y ?: -200f
 
-                        when (hand) {
-                            "left" -> {
-                                gameView.updateLeftHandPosition(x, y)
-                                startScreen.updateLeftHandPosition(x, y)
-                                pauseMenu.updateLeftHandPosition(x, y)
-                            }
-                            "right" -> {
-                                gameView.updateRightHandPosition(x, y)
-                                startScreen.updateRightHandPosition(x, y)
-                                pauseMenu.updateRightHandPosition(x, y)
-                            }
+                        val views = listOf(gameView, pauseMenu, startScreen)
+
+                        views.forEach { view ->
+                            if (hand == "left") view.updateLeftHandPosition(posX, posY)
+                            else view.updateRightHandPosition(posX, posY)
+                        }
+                        if (x == null || y == null) {
+                            Log.d("hand", hand)
+
+                            return
                         }
                         fruitSliceView.registerHandSlice(if (hand == "left") 1001 else 1002, x, y) // nếu có
-                        if (!GS.isGameOver()) {
+                        if (!GS.isEndGame) {
                             // Gọi slice effect như dispatchTouchEvent
                             val receiver: SliceEffectReceiver = when {
                                 pauseMenu.isVisible -> pauseMenu
-                                !GS.isGameStarted() -> startScreen
-                                !GS.isPaused() -> gameView
+                                !GS.isGameStarted -> startScreen
+                                !GS.isPaused -> gameView
                                 else -> return
                             }
                             receiver.onSliceAt(x, y)
@@ -402,7 +468,7 @@ class MainActivity : AppCompatActivity() {
                 }
             })
 
-            cameraSource!!.setMachineLearningFrameProcessor(processor)
+            cameraSource.setMachineLearningFrameProcessor(processor)
         } catch (e: Exception) {
             Log.e(TAG, "Can not create image processor", e)
             Toast.makeText(
@@ -413,7 +479,7 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
     }
-
+    
     private fun enableFullScreen() {
         @Suppress("DEPRECATION")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -465,7 +531,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isPermissionGranted(context: Context, permission: String): Boolean {
-        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        if (ContextCompat.checkSelfPermission(
+                context,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
         ) {
             Log.i(TAG, "Permission granted: $permission")
             return true
@@ -479,17 +548,17 @@ class MainActivity : AppCompatActivity() {
             mediaPlayer = MediaPlayer.create(context, R.raw.theme_song)
             mediaPlayer?.isLooping = true
         }
-        if (!GS.isMusicEnabled()) {
+        if (!GS.isMusicEnabled) {
             mediaPlayer?.start()
         }
     }
 
     fun setMusicEnabled(enable: Boolean) {
-        GS.setMusicEnabled(enable)
+        GS.isMusicEnabled = enable
         if (mediaPlayer == null) {
             return
         }
-        if (enable){
+        if (enable) {
             mediaPlayer?.start()
         } else {
             mediaPlayer?.pause()

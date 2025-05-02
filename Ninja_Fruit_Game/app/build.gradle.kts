@@ -13,8 +13,7 @@ android {
         minSdk = 28
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
-
+        versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -44,29 +43,38 @@ android {
         compose = true
     }
     applicationVariants.all {
-    if (buildType.name == "release") {
-        outputs.all {
-            val outputImpl = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
-            val versionName = this@all.versionName
-            outputImpl.outputFileName = "Ninja-Fruit-v$versionName.apk"
+        if (buildType.name == "release") {
+            val versionName = this.versionName   // Lấy versionName từ variant
+            outputs.all {
+                val outputImpl = this as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+                outputImpl.outputFileName = "Ninja-Fruit-v$versionName.apk"
+            }
         }
     }
-}
+
 
 }
 
 dependencies {
-    implementation("androidx.camera:camera-core:1.3.0")
+    val cameraxVersion = "1.2.0-alpha02"
+    // CameraX core library
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+
+    // CameraX Camera2 extensions
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+
+    // CameraX Lifecycle library
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+
+    // CameraX View class
+    implementation("androidx.camera:camera-view:$cameraxVersion")
 
     // MediaPipe Tasks Vision SDK (Google AI)
+    implementation("com.google.mediapipe:tasks-vision:latest.release")
     implementation("com.google.mlkit:pose-detection-accurate:18.0.0-beta5")
     implementation("com.google.mlkit:pose-detection:18.0.0-beta5")
-    implementation("com.google.mediapipe:tasks-vision:latest.release")
-
-    implementation("com.google.mlkit:camera:16.0.0-beta3")
-
-    // Subject Segmentation
     implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+
     // Coroutine (nếu cần dùng async sau này)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 

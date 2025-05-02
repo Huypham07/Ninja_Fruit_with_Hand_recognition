@@ -11,16 +11,18 @@ import android.view.View
 import com.hci.ninjafruitgame.model.GameObject
 import com.hci.ninjafruitgame.R
 import com.hci.ninjafruitgame.model.GameObjectType
+import com.hci.ninjafruitgame.model.PlayerState
 import com.hci.ninjafruitgame.model.SlicedPiece
 import kotlin.random.Random
-import androidx.core.content.edit
 import com.hci.ninjafruitgame.model.GameState as GS
 import com.hci.ninjafruitgame.utils.SoundManager
 import kotlin.math.sqrt
 
 class GameView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
-) : View(context, attrs), SliceEffectReceiver {
+) : View(context, attrs), SliceEffectReceiver, HandPositionUpdatable {
+
+    private val playerState = PlayerState()
 
     private val choreographer = Choreographer.getInstance()
 
@@ -63,6 +65,7 @@ class GameView @JvmOverloads constructor(
     private val freezeBitmapResId = R.drawable.freeze_fruit
     private val freezeOverlayBitmap = BitmapFactory.decodeResource(resources, R.drawable.freeze_bg)
 
+
     private val explodeBitmap = BitmapFactory.decodeResource(resources, R.drawable.explode)
     private val explodeBitmapResId = R.drawable.explode
 
@@ -102,25 +105,25 @@ class GameView @JvmOverloads constructor(
         }
     }
 
-
     init {
         choreographer.postFrameCallback(gameLoop)
     }
 
 
     private fun update() {
-        if (GS.isPaused() || GS.isGameOver()) return
+        if (GS.isPaused || playerState.isGameOver) return
 
         // Kiểm tra hiệu ứng freeze hết hạn
-        if (GS.isFreeze() && System.currentTimeMillis() - GS.getFreezeStartTime() > GS.getFreezeDuration()) {
-            GS.setFreeze(freeze = false)
+        if (playerState.isFreeze && System.currentTimeMillis() - playerState.freezeStartTime > playerState.freezeDuration) {
+            playerState.isFreeze = false
         }
 
         // Tính toán tỉ lệ làm chậm
-        val speedFactor = if (GS.isFreeze()) 0.25f else 1f
+        val speedFactor = if (playerState.isFreeze) 0.25f else 1f
 
 
         // Spawn fruit mỗi 1.2s
+
         spawnCounter++
         if (spawnCounter >= 75) {
             if (spawnCounter % 75 == 0) {
@@ -348,7 +351,7 @@ class GameView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        if (!GS.isUseCamera()) {
+        if (!GS.isUseCamera) {
             canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
         }
 
@@ -356,14 +359,17 @@ class GameView @JvmOverloads constructor(
 
         splashMarks.forEach { it.draw(canvas, paint) }
         slicedPieces.forEach { it.draw(canvas) }
-        particles.forEach { it.draw(canvas, paint) }
+        if (!playerState.isFreeze) {
+            particles.forEach { it.draw(canvas, paint) }
+        }
         scorePops.forEach { it.draw(canvas, scorePopTextPaint) }
 
-        if (GS.isFreeze()) {
+        if (playerState.isFreeze) {
             canvas.drawBitmap(freezeOverlayBitmap, null, Rect(0, 0, width, height), null)
         }
 
-        if (GS.isUseHandTracker()) {
+
+        if (GS.isUseHandTracker) {
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
             canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
@@ -374,7 +380,7 @@ class GameView @JvmOverloads constructor(
         drawLives(canvas)
         drawGuard(canvas)
 
-        if (GS.isGameOver()) {
+        if (playerState.isGameOver) {
             val overlayPaint = Paint().apply {
                 color = Color.argb((0.6f * 255).toInt(), 0, 0, 0)
             }
@@ -390,17 +396,26 @@ class GameView @JvmOverloads constructor(
 
             canvas.save()
             canvas.scale(gameOverScale, gameOverScale, width / 2f, height / 2f - 50f)
-            canvas.drawBitmap(gameOverBitmap, width / 2f - gameOverBitmap.width / 2f, height / 2f - gameOverBitmap.height / 2f, null)
+            val ratio = gameOverBitmap.width / gameOverBitmap.height
+            val w = width * 4 / 6
+            val h =  w / ratio
+            val gameOverRect = Rect(
+                width / 2 - w / 2,
+                height / 2 - h / 2,
+                width / 2 + w / 2,
+                height / 2 + h / 2
+            )
+            canvas.drawBitmap(gameOverBitmap, null, gameOverRect, null)
             canvas.restore()
 
-            canvas.drawText("Score: ${GS.getScore()}", width / 2f, height / 2f + gameOverBitmap.height, scorePaint)
+            canvas.drawText("Score: ${playerState.score}", width / 2f, height / 2f + gameOverBitmap.height, scorePaint)
 
             invalidate() // Để giữ cho animation chạy
         }
     }
 
     private fun drawLives(canvas: Canvas) {
-        for (i in 0 until GS.getLives()) {
+        for (i in 0 until playerState.lives) {
             val left = width - (i + 1) * (lifeSize + lifeMargin)
             val top = lifeMargin
             canvas.drawBitmap(
@@ -413,7 +428,7 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun drawGuard(canvas: Canvas) {
-        if (GS.isGuard()) {
+        if (playerState.isGuard) {
             val left = width - 330
             val top = 140
             canvas.drawBitmap(
@@ -447,11 +462,11 @@ class GameView @JvmOverloads constructor(
                     when (gameObject.type) {
                         GameObjectType.TYPE_BOMB.value -> {
                             SoundManager.playSliceBomb()
-                            if (GS.isGuard()) {
-                                GS.setGuard(guard = false)
+                            if (playerState.isGuard) {
+                                playerState.isGuard = false
                             } else {
-                                val updateLives = GS.getLives() - 1
-                                GS.setLives(updateLives)
+                                val updateLives = playerState.lives - 1
+                                playerState.lives = updateLives
                                 if (updateLives <= 0) {
                                     triggerGameOver()
                                 } else {
@@ -499,7 +514,8 @@ class GameView @JvmOverloads constructor(
 
                     when (gameObject.type) {
                         GameObjectType.TYPE_FRUIT.value -> {
-                            val currentScore = GS.getScore() + 1
+                            val currentScore = playerState.score + 1
+                            playerState.score = currentScore
                             scorePops.add(
                                 ScorePop(
                                     position = PointF(centerX + 30f, centerY), // gần điểm chém
@@ -507,8 +523,8 @@ class GameView @JvmOverloads constructor(
                                 )
                             )
 
-                            if (currentScore > GS.getBestScore()) {
-                                GS.setBestScore(currentScore)
+                            if (currentScore > GS.bestScore && !GS.isVersusMode) {
+                                GS.bestScore = currentScore
                             }
 
                             val fruitColor = fruitColorMap[gameObject.bitmapResId] ?: Color.WHITE
@@ -516,8 +532,8 @@ class GameView @JvmOverloads constructor(
                             addSplashMark(centerX, centerY, gameObject.bitmapResId)
                         }
                         GameObjectType.TYPE_FREEZE.value -> {
-                            GS.setFreeze(true)
-                            GS.setFreezeStartTime(System.currentTimeMillis())
+                            playerState.isFreeze = true
+                            playerState.freezeStartTime = System.currentTimeMillis()
 
                             emitParticles(centerX, centerY, Color.CYAN)
                         }
@@ -528,7 +544,7 @@ class GameView @JvmOverloads constructor(
                             explodeAll()
                         }
                         GameObjectType.TYPE_GUARD.value -> {
-                            GS.setGuard(true)
+                            playerState.isGuard = true
                         }
                     }
                 }
@@ -586,7 +602,8 @@ class GameView @JvmOverloads constructor(
 
                 when (gameObject.type) {
                     GameObjectType.TYPE_FRUIT.value -> {
-                        val currentScore = GS.getScore() + 1
+                        val currentScore = playerState.score + 1
+                        playerState.score = currentScore
                         scorePops.add(
                             ScorePop(
                                 position = PointF(centerX + 30f, centerY), // gần điểm chém
@@ -594,8 +611,8 @@ class GameView @JvmOverloads constructor(
                             )
                         )
 
-                        if (currentScore > GS.getBestScore()) {
-                            GS.setBestScore(currentScore)
+                        if (currentScore > GS.bestScore && !GS.isVersusMode) {
+                            GS.bestScore = currentScore
                         }
 
                         val fruitColor = fruitColorMap[gameObject.bitmapResId] ?: Color.WHITE
@@ -603,8 +620,8 @@ class GameView @JvmOverloads constructor(
                         addSplashMark(centerX, centerY, gameObject.bitmapResId)
                     }
                     GameObjectType.TYPE_FREEZE.value -> {
-                        GS.setFreeze(true)
-                        GS.setFreezeStartTime(System.currentTimeMillis())
+                        playerState.isFreeze = true
+                        playerState.freezeStartTime = System.currentTimeMillis()
 
                         emitParticles(centerX, centerY, Color.CYAN)
                     }
@@ -615,7 +632,7 @@ class GameView @JvmOverloads constructor(
                         explodeAll()
                     }
                     GameObjectType.TYPE_GUARD.value -> {
-                        GS.setGuard(true)
+                        playerState.isGuard = true
                     }
                 }
             }
@@ -623,7 +640,7 @@ class GameView @JvmOverloads constructor(
     }
 
     private fun triggerGameOver() {
-        GS.setGameOver(true)
+        playerState.isGameOver = true
         invalidate()
 
         onGameOver?.invoke()
@@ -703,13 +720,15 @@ class GameView @JvmOverloads constructor(
         val scoreY = iconY + scoreIcon.height * 0.75f
 
         // Vẽ điểm hiện tại với viền
-        canvas.drawText(GS.getScore().toString(), scoreX, scoreY, scoreStrokePaint)
-        canvas.drawText(GS.getScore().toString(), scoreX, scoreY, scoreTextPaint)
+        canvas.drawText(playerState.score.toString(), scoreX, scoreY, scoreStrokePaint)
+        canvas.drawText(playerState.score.toString(), scoreX, scoreY, scoreTextPaint)
 
         // Vị trí Best Score
-        val bestY = scoreY + 70f
-        canvas.drawText("Best: ${GS.getBestScore()}", iconX, bestY, bestStrokePaint)
-        canvas.drawText("Best: ${GS.getBestScore()}", iconX, bestY, bestTextPaint)
+        if (!GS.isVersusMode) {
+            val bestY = scoreY + 70f
+            canvas.drawText("Best: ${GS.bestScore}", iconX, bestY, bestStrokePaint)
+            canvas.drawText("Best: ${GS.bestScore}", iconX, bestY, bestTextPaint)
+        }
     }
 
     fun resetGame() {
@@ -722,7 +741,7 @@ class GameView @JvmOverloads constructor(
 
         spawnCounter = 0
 
-        GS.resetGame()
+        playerState.reset()
         invalidate()
     }
 
@@ -743,17 +762,17 @@ class GameView @JvmOverloads constructor(
         onGameOver = listener
     }
 
-    private var leftHandX = 0f
-    private var leftHandY = 0f
-    private var rightHandX = 0f
-    private var rightHandY = 0f
+    private var leftHandX = -200f
+    private var leftHandY = -200f
+    private var rightHandX = -200f
+    private var rightHandY = -200f
 
-    fun updateLeftHandPosition(leftX: Float, leftY: Float) {
+    override fun updateLeftHandPosition(leftX: Float, leftY: Float) {
         leftHandX = leftX
         leftHandY = leftY
     }
 
-    fun updateRightHandPosition(rightX: Float, rightY: Float) {
+    override fun updateRightHandPosition(rightX: Float, rightY: Float) {
         rightHandX = rightX
         rightHandY = rightY
     }

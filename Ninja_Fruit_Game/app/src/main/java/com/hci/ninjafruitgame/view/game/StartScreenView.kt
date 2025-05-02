@@ -19,7 +19,7 @@ import com.hci.ninjafruitgame.model.GameState as GS
 
 class StartScreenView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
-) : View(context, attrs), SliceEffectReceiver {
+) : View(context, attrs), SliceEffectReceiver, HandPositionUpdatable {
 
     private val choreographer = Choreographer.getInstance()
 
@@ -38,6 +38,10 @@ class StartScreenView @JvmOverloads constructor(
     private val fruitQuitBitmap = BitmapFactory.decodeResource(resources, R.drawable.bomb)
     private val fruitQuitColor = "#FBF1BC".toColorInt()
 
+    private val ringVersusBitmap = BitmapFactory.decodeResource(resources, R.drawable.versus)
+    private val fruitVersusBitmap = BitmapFactory.decodeResource(resources, R.drawable.basaha)
+    private val fruitVersusColor = Color.RED
+
     private val particles = mutableListOf<Particle>()
     private val splashMarks = mutableListOf<SplashMark>()
 
@@ -54,7 +58,7 @@ class StartScreenView @JvmOverloads constructor(
     private var ringRotation = 0f
     private var fruitRotation = 0f
 
-    private val shiftX = 150f
+    private val shiftX = 300f
     private val shiftY = 100f
 
     private val largeShiftY = 250f
@@ -113,8 +117,8 @@ class StartScreenView @JvmOverloads constructor(
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
-            ringRotation += 2f
-            fruitRotation -= 3f
+            ringRotation += 1f
+            fruitRotation -= 2f
             val pIter = particles.iterator()
             while (pIter.hasNext()) {
                 val p = pIter.next()
@@ -166,7 +170,7 @@ class StartScreenView @JvmOverloads constructor(
     @SuppressLint("DrawAllocation")
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (!GS.isUseCamera()) {
+        if (!GS.isUseCamera) {
             canvas.drawBitmap(backgroundBitmap, null, Rect(0, 0, width, height), null)
         }
 
@@ -191,30 +195,39 @@ class StartScreenView @JvmOverloads constructor(
         )
         drawFruitWithRing(
             canvas,
-            centerX - shiftX - ringSettingBitmap.width / 2,
+            centerX - ringVersusBitmap.width / 2,
+            centerY + largeShiftY,
+            ringVersusBitmap,
+            fruitVersusBitmap,
+            ringScale * 0.95f,
+            fruitRotation,
+            ringRotation
+        )
+        drawFruitWithRing(
+            canvas,
+            centerX - 260f - ringSettingBitmap.width,
             centerY + largeShiftY,
             ringSettingBitmap,
             fruitSettingBitmap,
             ringScale * 0.8f,
-            fruitRotation * 0.8f,
-            ringRotation * 0.8f
+            fruitRotation,
+            ringRotation
         )
         drawFruitWithRing(
             canvas,
-            centerX + shiftX + ringBitmap.width,
+            centerX + 200f + ringBitmap.width,
             centerY + largeShiftY,
             ringQuitBitmap,
             fruitQuitBitmap,
             ringScale * 0.8f,
-            fruitRotation * 0.8f,
-            ringRotation * 0.8f
+            fruitRotation,
+            ringRotation
         )
-
 
         splashMarks.forEach { it.draw(canvas, paint) }
         particles.forEach { it.draw(canvas, paint) }
 
-        if (GS.isUseHandTracker()) {
+        if (GS.isUseHandTracker) {
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
             canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
@@ -250,11 +263,21 @@ class StartScreenView @JvmOverloads constructor(
     override fun onSliceAt(x: Float, y: Float) {
         if (isExiting) return
 
+        val centerX = width / 2f
+        val centerY = height / 2f
+
         when {
-            isSlicedAt(x, y, width / 2f + shiftX, height / 2f + shiftY, fruitBitmap) -> {
+            isSlicedAt(
+                x,
+                y,
+                centerX + shiftX,
+                centerY + shiftY,
+                fruitBitmap
+            ) -> {
                 emitStartParticles(x, y, fruitColor)
                 addStartSplash(x, y, "peach")
                 SoundManager.playSlice()
+                GS.isVersusMode = false
                 playExitAnimation {
                     onStartGame?.invoke()
                 }
@@ -263,22 +286,39 @@ class StartScreenView @JvmOverloads constructor(
             isSlicedAt(
                 x,
                 y,
-                width / 2f - shiftX - ringSettingBitmap.width / 2,
-                height / 2f + largeShiftY,
+                centerX - ringVersusBitmap.width / 2,
+                centerY + largeShiftY,
+                fruitVersusBitmap
+            ) -> {
+                emitStartParticles(x, y, fruitVersusColor)
+                addStartSplash(x, y, "basaha")
+                SoundManager.playSlice()
+                if (!GS.isUseHandTracker) {
+                    GS.isVersusMode = true
+                    playExitAnimation {
+                        onStartGame?.invoke()
+                    }
+                }
+            }
+
+            isSlicedAt(
+                x,
+                y,
+                centerX - 260f - ringSettingBitmap.width,
+                centerY + largeShiftY,
                 fruitSettingBitmap
             ) -> {
                 emitStartParticles(x, y, fruitSettingColor)
                 addStartSplash(x, y, "apple")
                 SoundManager.playSlice()
                 onOpenSettings?.invoke()
-
             }
 
             isSlicedAt(
                 x,
                 y,
-                width / 2f + shiftX + ringBitmap.width,
-                height / 2f + largeShiftY,
+                centerX + 200f + ringBitmap.width,
+                centerY + largeShiftY,
                 fruitQuitBitmap
             ) -> {
                 emitStartParticles(x, y, fruitQuitColor)
@@ -330,17 +370,17 @@ class StartScreenView @JvmOverloads constructor(
         backgroundBitmap = BitmapFactory.decodeResource(resources, resId)
     }
 
-    private var leftHandX = 0f
-    private var leftHandY = 0f
-    private var rightHandX = 0f
-    private var rightHandY = 0f
+    private var leftHandX = -200f
+    private var leftHandY = -200f
+    private var rightHandX = -200f
+    private var rightHandY = -200f
 
-    fun updateLeftHandPosition(leftX: Float, leftY: Float) {
+    override fun updateLeftHandPosition(leftX: Float, leftY: Float) {
         leftHandX = leftX
         leftHandY = leftY
     }
 
-    fun updateRightHandPosition(rightX: Float, rightY: Float) {
+    override fun updateRightHandPosition(rightX: Float, rightY: Float) {
         rightHandX = rightX
         rightHandY = rightY
     }
