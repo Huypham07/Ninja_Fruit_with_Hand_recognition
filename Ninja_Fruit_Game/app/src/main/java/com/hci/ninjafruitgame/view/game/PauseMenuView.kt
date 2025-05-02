@@ -19,7 +19,7 @@ import com.hci.ninjafruitgame.model.GameState as GS
 class PauseMenuView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
-) : View(context, attrs), SliceEffectReceiver {
+) : View(context, attrs), SliceEffectReceiver, HandPositionUpdatable {
 
     private val choreographer = Choreographer.getInstance()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -56,6 +56,7 @@ class PauseMenuView @JvmOverloads constructor(
 
     private var titleY = -200f
     private var bgY = -300f
+    private var titleOptY = bgY
     private var btnY = 1700f
 
     private var homeRect = RectF()
@@ -88,6 +89,7 @@ class PauseMenuView @JvmOverloads constructor(
             val value = it.animatedValue as Float
             titleY = value * 40f
             bgY = value * 150f
+            titleOptY = value * 150f
 
             btnY = 970f - value * 100f
             ringScale = 1.2f - value * 0.5f
@@ -112,6 +114,8 @@ class PauseMenuView @JvmOverloads constructor(
                 val value = it.animatedValue as Float
                 titleY = 40f - value * 150f
                 bgY = 150f - value * 600f
+                titleOptY = 150f - value * 900f
+
 
                 btnY = 870f + value * 300f
 
@@ -189,7 +193,7 @@ class PauseMenuView @JvmOverloads constructor(
         val aspectRatio = bgBitmap.width.toFloat() / bgBitmap.height.toFloat()
         val scaledWidth = (scaledHeight * aspectRatio).toInt()
 
-        if (GS.isGameStarted()) {
+        if (GS.isGameStarted) {
             val titleRect = RectF(
                 centerX - scaledWidth * 0.2f,
                 titleY,
@@ -222,17 +226,17 @@ class PauseMenuView @JvmOverloads constructor(
         val muteX = centerX - 120f - 200f - iconSize
         muteRect.set(muteX, icon1Y.toFloat(), muteX + iconSize, icon1Y + iconSize)
 
-        canvas.drawBitmap(if (GS.isMusicEnabled()) unmuteBitmap else muteBitmap, null, muteRect, paint)
+        canvas.drawBitmap(if (GS.isMusicEnabled) unmuteBitmap else muteBitmap, null, muteRect, paint)
 
         val icon2XLeft = right - 140f - iconSize
         val icon2XRight = right - 140f
         cameraRect.set(icon2XLeft, bgY + scaledHeight / 2 + 140f - iconSize, icon2XRight, bgY + scaledHeight / 2 + 140f)
         handRect.set(icon2XLeft, bgY + scaledHeight / 2 + 260f - iconSize, icon2XRight, bgY + scaledHeight / 2 + 260f)
 
-        canvas.drawBitmap(if (GS.isUseCamera()) cameraBitmap else cameraLockBitmap, null, cameraRect, paint)
-        canvas.drawBitmap(if (GS.isUseHandTracker()) handBitmap else handLockBitmap, null, handRect, paint)
+        canvas.drawBitmap(if (GS.isUseCamera) cameraBitmap else cameraLockBitmap, null, cameraRect, paint)
+        canvas.drawBitmap(if (GS.isUseHandTracker) handBitmap else handLockBitmap, null, handRect, paint)
 
-        if (GS.isGameStarted()) {
+        if (GS.isGameStarted) {
             // Tính chiều rộng vùng bg_settings đã vẽ
             val totalButtonArea = (scaledWidth * 0.6).toInt()
 
@@ -289,18 +293,18 @@ class PauseMenuView @JvmOverloads constructor(
         paint.textSize = 52f
         paint.textAlign = Paint.Align.CENTER
         val text = "Background: $currentBgIndex"
-        canvas.drawText(text, centerX + 120f, bgY + scaledHeight / 2 - 60f, paint)
+        canvas.drawText(text, centerX + 120f, titleOptY + scaledHeight / 2 - 60f, paint)
 
         paint.textSize = 48f
         paint.textAlign = Paint.Align.LEFT
         val leftAlignX = left + 140f
-        val useCameraBgText = if (GS.isUseCamera()) "Use Camera as background" else "Use Camera as background (locked)"
-        canvas.drawText(useCameraBgText, leftAlignX, bgY + scaledHeight / 2 + 120, paint)
+        val useCameraBgText = if (GS.isUseCamera) "Use Camera as background" else "Use Camera as background (locked)"
+        canvas.drawText(useCameraBgText, leftAlignX, titleOptY + scaledHeight / 2 + 120, paint)
 
-        val useHandText = if (GS.isUseHandTracker()) "Use Hand Detection" else "Use Hand Detection (locked)"
-        canvas.drawText(useHandText, leftAlignX, bgY + scaledHeight / 2 + 240, paint)
+        val useHandText = if (GS.isUseHandTracker) "Use Hand Detection" else "Use Hand Detection (locked)"
+        canvas.drawText(useHandText, leftAlignX, titleOptY + scaledHeight / 2 + 240, paint)
 
-        if (GS.isUseHandTracker()) {
+        if (GS.isUseHandTracker) {
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexFillPaint)
             canvas.drawCircle(leftHandX, leftHandY, 40f, leftIndexStrokePaint)
             canvas.drawCircle(rightHandX, rightHandY, 40f, rightIndexFillPaint)
@@ -342,19 +346,19 @@ class PauseMenuView @JvmOverloads constructor(
                 debounceBgChange()
             }
             muteRect.contains(x, y) -> {
-                val enable = !GS.isMusicEnabled()
+                val enable = !GS.isMusicEnabled
                 onToggleMusicEnabled?.invoke(enable)
             }
             cameraRect.contains(x, y) -> {
-                val isUsedCamera = !GS.isUseCamera()
+                val isUsedCamera = !GS.isUseCamera
                 onToggleCameraBackground?.invoke(isUsedCamera)
             }
             handRect.contains(x, y) -> {
-                val isUsedHand = !GS.isUseHandTracker()
+                val isUsedHand = !GS.isUseHandTracker
                 onToggleHandDetection?.invoke(isUsedHand)
             }
         }
-        if (!GS.isGameStarted()) {
+        if (!GS.isGameStarted) {
             val centerX = 260f
             val centerY = 700f
             val dx = x - centerX
@@ -422,17 +426,17 @@ class PauseMenuView @JvmOverloads constructor(
         }
     }
 
-    private var leftHandX = 0f
-    private var leftHandY = 0f
-    private var rightHandX = 0f
-    private var rightHandY = 0f
+    private var leftHandX = -200f
+    private var leftHandY = -200f
+    private var rightHandX = -200f
+    private var rightHandY = -200f
 
-    fun updateLeftHandPosition(leftX: Float, leftY: Float) {
+    override fun updateLeftHandPosition(leftX: Float, leftY: Float) {
         leftHandX = leftX
         leftHandY = leftY
     }
 
-    fun updateRightHandPosition(rightX: Float, rightY: Float) {
+    override fun updateRightHandPosition(rightX: Float, rightY: Float) {
         rightHandX = rightX
         rightHandY = rightY
     }

@@ -20,7 +20,7 @@ data class GameObject(
             position.x += velocity.x * speedFactor
             position.y += velocity.y * speedFactor
             velocity.y += gravity * speedFactor
-            rotation += rotationSpeed * speedFactor
+            rotation += rotationSpeed
         }
     }
 
