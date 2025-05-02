@@ -293,11 +293,9 @@ class StartScreenView @JvmOverloads constructor(
                 emitStartParticles(x, y, fruitVersusColor)
                 addStartSplash(x, y, "basaha")
                 SoundManager.playSlice()
-                if (!GS.isUseHandTracker) {
-                    GS.isVersusMode = true
-                    playExitAnimation {
-                        onStartGame?.invoke()
-                    }
+                GS.isVersusMode = true
+                playExitAnimation {
+                    onStartGame?.invoke()
                 }
             }
 

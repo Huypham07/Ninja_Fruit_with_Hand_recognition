@@ -5,51 +5,117 @@ class HandTracker(
     private val listener: HandLandmarkListener
 ) {
 
-    private val kalmanLeft = KalmanFilter2D()
-    private val kalmanRight = KalmanFilter2D()
+    private val kalmanLeft1 = KalmanFilter2D()
+    private val kalmanRight1 = KalmanFilter2D()
+    private val kalmanLeft2 = KalmanFilter2D()
+    private val kalmanRight2 = KalmanFilter2D()
 
-    private var lastLeftX: Float? = null
-    private var lastLeftY: Float? = null
-    private var lastRightX: Float? = null
-    private var lastRightY: Float? = null
+    private var lastLeftX1: Float? = null
+    private var lastLeftY1: Float? = null
+    private var lastRightX1: Float? = null
+    private var lastRightY1: Float? = null
 
-    fun update(leftX: Float?, leftY: Float?, rightX: Float?, rightY: Float?) {
+    private var lastLeftX2: Float? = null
+    private var lastLeftY2: Float? = null
+    private var lastRightX2: Float? = null
+    private var lastRightY2: Float? = null
+
+    // Hàm cập nhật cả 2 người cùng lúc
+    fun update(
+        leftX1: Float?, leftY1: Float?, rightX1: Float?, rightY1: Float?,
+        leftX2: Float?, leftY2: Float?, rightX2: Float?, rightY2: Float?
+    ) {
+        val updated1 = updatePlayer1(leftX1, leftY1, rightX1, rightY1, false)
+        val updated2 = updatePlayer2(leftX2, leftY2, rightX2, rightY2, false)
+
+        if (updated1) listener.onPlayer1HandLandmarksReceived(lastLeftX1, lastLeftY1, lastRightX1, lastRightY1)
+        if (updated2) listener.onPlayer2HandLandmarksReceived(lastLeftX2, lastLeftY2, lastRightX2, lastRightY2)
+    }
+
+    // Hàm cập nhật riêng cho người 1
+    fun updatePlayer1(
+        leftX: Float?, leftY: Float?, rightX: Float?, rightY: Float?,
+        notify: Boolean = true
+    ): Boolean {
         var sendUpdate = false
 
         // LEFT
         if (leftX != null && leftY != null) {
-            val (filteredLeftX, filteredLeftY) = kalmanLeft.update(leftX, leftY)
-
-            val dx = if (lastLeftX != null) kotlin.math.abs(filteredLeftX - lastLeftX!!) else Float.MAX_VALUE
-            val dy = if (lastLeftY != null) kotlin.math.abs(filteredLeftY - lastLeftY!!) else Float.MAX_VALUE
+            val (filteredLeftX, filteredLeftY) = kalmanLeft1.update(leftX, leftY)
+            val dx = if (lastLeftX1 != null) kotlin.math.abs(filteredLeftX - lastLeftX1!!) else Float.MAX_VALUE
+            val dy = if (lastLeftY1 != null) kotlin.math.abs(filteredLeftY - lastLeftY1!!) else Float.MAX_VALUE
 
             if (dx > movementThreshold || dy > movementThreshold) {
-                lastLeftX = filteredLeftX
-                lastLeftY = filteredLeftY
+                lastLeftX1 = filteredLeftX
+                lastLeftY1 = filteredLeftY
                 sendUpdate = true
             }
         }
 
         // RIGHT
         if (rightX != null && rightY != null) {
-            val (filteredRightX, filteredRightY) = kalmanRight.update(rightX, rightY)
-
-            val dx = if (lastRightX != null) kotlin.math.abs(filteredRightX - lastRightX!!) else Float.MAX_VALUE
-            val dy = if (lastRightY != null) kotlin.math.abs(filteredRightY - lastRightY!!) else Float.MAX_VALUE
+            val (filteredRightX, filteredRightY) = kalmanRight1.update(rightX, rightY)
+            val dx = if (lastRightX1 != null) kotlin.math.abs(filteredRightX - lastRightX1!!) else Float.MAX_VALUE
+            val dy = if (lastRightY1 != null) kotlin.math.abs(filteredRightY - lastRightY1!!) else Float.MAX_VALUE
 
             if (dx > movementThreshold || dy > movementThreshold) {
-                lastRightX = filteredRightX
-                lastRightY = filteredRightY
+                lastRightX1 = filteredRightX
+                lastRightY1 = filteredRightY
                 sendUpdate = true
             }
         }
 
-        if (sendUpdate) {
-            listener.onHandLandmarksReceived(
-                lastLeftX, lastLeftY,
-                lastRightX, lastRightY
+        if (sendUpdate && notify) {
+            listener.onPlayer1HandLandmarksReceived(
+                lastLeftX1, lastLeftY1,
+                lastRightX1, lastRightY1
             )
         }
+
+        return sendUpdate
+    }
+
+    // Hàm cập nhật riêng cho người 2
+    fun updatePlayer2(
+        leftX: Float?, leftY: Float?, rightX: Float?, rightY: Float?,
+        notify: Boolean = true
+    ): Boolean {
+        var sendUpdate = false
+
+        // LEFT
+        if (leftX != null && leftY != null) {
+            val (filteredLeftX, filteredLeftY) = kalmanLeft2.update(leftX, leftY)
+            val dx = if (lastLeftX2 != null) kotlin.math.abs(filteredLeftX - lastLeftX2!!) else Float.MAX_VALUE
+            val dy = if (lastLeftY2 != null) kotlin.math.abs(filteredLeftY - lastLeftY2!!) else Float.MAX_VALUE
+
+            if (dx > movementThreshold || dy > movementThreshold) {
+                lastLeftX2 = filteredLeftX
+                lastLeftY2 = filteredLeftY
+                sendUpdate = true
+            }
+        }
+
+        // RIGHT
+        if (rightX != null && rightY != null) {
+            val (filteredRightX, filteredRightY) = kalmanRight2.update(rightX, rightY)
+            val dx = if (lastRightX2 != null) kotlin.math.abs(filteredRightX - lastRightX2!!) else Float.MAX_VALUE
+            val dy = if (lastRightY2 != null) kotlin.math.abs(filteredRightY - lastRightY2!!) else Float.MAX_VALUE
+
+            if (dx > movementThreshold || dy > movementThreshold) {
+                lastRightX2 = filteredRightX
+                lastRightY2 = filteredRightY
+                sendUpdate = true
+            }
+        }
+
+        if (sendUpdate && notify) {
+            listener.onPlayer2HandLandmarksReceived(
+                lastLeftX2, lastLeftY2,
+                lastRightX2, lastRightY2
+            )
+        }
+
+        return sendUpdate
     }
 }
 
@@ -96,100 +162,3 @@ class KalmanFilter2D {
         return Pair(x, y)
     }
 }
-
-//package com.hci.ninjafruitgame.posedetector
-//
-//class HandTracker(
-//    private val minCutoff: Float = 1.0f,
-//    private val beta: Float = 0.0f,
-//    private val movementThreshold: Float = 3f,
-//    private val listener: HandLandmarkListener
-//) {
-//
-//    private val leftFilterX = OneEuroFilter()
-//    private val leftFilterY = OneEuroFilter()
-//    private val rightFilterX = OneEuroFilter()
-//    private val rightFilterY = OneEuroFilter()
-//
-//    private var lastLeftX: Float? = null
-//    private var lastLeftY: Float? = null
-//    private var lastRightX: Float? = null
-//    private var lastRightY: Float? = null
-//
-//    fun update(leftX: Float?, leftY: Float?, rightX: Float?, rightY: Float?) {
-//        var sendUpdate = false
-//
-//        val timestamp = System.nanoTime() / 1_000_000_000.0 // Convert to seconds
-//
-//        // LEFT
-//        if (leftX != null && leftY != null) {
-//            val filteredLeftX = leftFilterX.filter(leftX, timestamp, minCutoff, beta)
-//            val filteredLeftY = leftFilterY.filter(leftY, timestamp, minCutoff, beta)
-//
-//            val dx = if (lastLeftX != null) kotlin.math.abs(filteredLeftX - lastLeftX!!) else Float.MAX_VALUE
-//            val dy = if (lastLeftY != null) kotlin.math.abs(filteredLeftY - lastLeftY!!) else Float.MAX_VALUE
-//
-//            if (dx > movementThreshold || dy > movementThreshold) {
-//                lastLeftX = filteredLeftX
-//                lastLeftY = filteredLeftY
-//                sendUpdate = true
-//            }
-//        }
-//
-//        // RIGHT
-//        if (rightX != null && rightY != null) {
-//            val filteredRightX = rightFilterX.filter(rightX, timestamp, minCutoff, beta)
-//            val filteredRightY = rightFilterY.filter(rightY, timestamp, minCutoff, beta)
-//
-//            val dx = if (lastRightX != null) kotlin.math.abs(filteredRightX - lastRightX!!) else Float.MAX_VALUE
-//            val dy = if (lastRightY != null) kotlin.math.abs(filteredRightY - lastRightY!!) else Float.MAX_VALUE
-//
-//            if (dx > movementThreshold || dy > movementThreshold) {
-//                lastRightX = filteredRightX
-//                lastRightY = filteredRightY
-//                sendUpdate = true
-//            }
-//        }
-//
-//        if (sendUpdate) {
-//            listener.onHandLandmarksReceived(
-//                lastLeftX, lastLeftY,
-//                lastRightX, lastRightY
-//            )
-//        }
-//    }
-//}
-//
-//class OneEuroFilter {
-//    private var lastValue: Float? = null
-//    private var lastDerivate: Float = 0f
-//    private var lastTime: Double? = null
-//
-//    fun filter(x: Float, t: Double, minCutoff: Float, beta: Float, dCutoff: Float = 1.0f): Float {
-//        if (lastValue == null) {
-//            lastValue = x
-//            lastTime = t
-//            return x
-//        }
-//
-//        val dt = (t - lastTime!!).coerceAtLeast(1e-6)
-//        lastTime = t
-//
-//        // Derivative
-//        val dx = (x - lastValue!!) / dt
-//        val alphaD = smoothingFactor(dt, dCutoff)
-//        lastDerivate += alphaD * (dx.toFloat() - lastDerivate)
-//
-//        val cutoff = minCutoff + beta * kotlin.math.abs(lastDerivate)
-//        val alpha = smoothingFactor(dt, cutoff)
-//        lastValue = lastValue!! + alpha * (x - lastValue!!)
-//
-//        return lastValue!!
-//    }
-//
-//    private fun smoothingFactor(dt: Double, cutoff: Float): Float {
-//        val r = 2 * Math.PI * cutoff * dt
-//        return (r / (r + 1)).toFloat()
-//    }
-//}
-//

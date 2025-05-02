@@ -199,51 +199,6 @@ abstract class VisionProcessorBase<T>(context: Context) :
       .addOnSuccessListener(executor) { processLatestImage(graphicOverlay) }
   }
 
-  // -----------------Code for processing live preview frame from CameraX API-----------------------
-  @RequiresApi(VERSION_CODES.LOLLIPOP)
-  @ExperimentalGetImage
-  override fun processImageProxy(image: ImageProxy, graphicOverlay: GraphicOverlay) {
-    val frameStartMs = SystemClock.elapsedRealtime()
-    if (isShutdown) {
-      return
-    }
-    var bitmap: Bitmap? = null
-    if (!PreferenceUtils.isCameraLiveViewportEnabled(graphicOverlay.context)) {
-      bitmap = BitmapUtils.getBitmap(image)
-    }
-
-    if (isMlImageEnabled(graphicOverlay.context)) {
-      val mlImage =
-        MediaMlImageBuilder(image.image!!).setRotation(image.imageInfo.rotationDegrees).build()
-      requestDetectInImage(
-        mlImage,
-        graphicOverlay,
-        /* originalCameraImage= */ bitmap,
-        /* shouldShowFps= */ true,
-        frameStartMs
-      )
-        // When the image is from CameraX analysis use case, must call image.close() on received
-        // images when finished using them. Otherwise, new images may not be received or the camera
-        // may stall.
-        // Currently MlImage doesn't support ImageProxy directly, so we still need to call
-        // ImageProxy.close() here.
-        .addOnCompleteListener { image.close() }
-
-      return
-    }
-
-    requestDetectInImage(
-      InputImage.fromMediaImage(image.image!!, image.imageInfo.rotationDegrees),
-      graphicOverlay,
-      /* originalCameraImage= */ bitmap,
-      /* shouldShowFps= */ true,
-      frameStartMs
-    )
-      // When the image is from CameraX analysis use case, must call image.close() on received
-      // images when finished using them. Otherwise, new images may not be received or the camera
-      // may stall.
-      .addOnCompleteListener { image.close() }
-  }
 
   // -----------------Common processing logic-------------------------------------------------------
   private fun requestDetectInImage(
@@ -270,7 +225,7 @@ abstract class VisionProcessorBase<T>(context: Context) :
     frameStartMs: Long
   ): Task<T> {
     return setUpListener(
-      detectInImage(image),
+      detectInImage(image, originalCameraImage),
       graphicOverlay,
       originalCameraImage,
       shouldShowFps,
@@ -391,7 +346,7 @@ abstract class VisionProcessorBase<T>(context: Context) :
 
   protected abstract fun detectInImage(image: InputImage): Task<T>
 
-  protected open fun detectInImage(image: MlImage): Task<T> {
+  protected open fun detectInImage(image: MlImage, originalCameraImage: Bitmap?): Task<T> {
     return Tasks.forException(
       MlKitException(
         "MlImage is currently not demonstrated for this feature",

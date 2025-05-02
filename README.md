@@ -16,7 +16,9 @@
 
 - **Customization:**
   - Changeable backgrounds.
-  - Versus mode (currently available only in Touch Mode).
+  - **Versus mode:** Available only in the Android version.
+    - Available in Touch Mode on all platforms.
+    - Tracking-based Versus Mode is only available on the Android version and requires a relatively powerful device (e.g., Snapdragon 845 or better).
 
 ## Versions
 
@@ -30,7 +32,9 @@
 
 - Fully featured and optimized for smooth performance across most Android devices.
 - Better overall experience compared to the web version.
-- Versus mode and other interactions are fully integrated (except for tracking-based versus mode, which is still in development).
+- Includes full support for game interactions and versus mode:
+  - Touch-based versus mode.
+  - Tracking-based versus mode is supported but requires a device with decent hardware performance to ensure smooth gameplay.
 
 > **Note:**  
 > For future development of tracking-based versus mode, devices need good hardware support, and improvements in detection models are required, as ML Kit and MediaPipe currently have limitations with multi-object detection.

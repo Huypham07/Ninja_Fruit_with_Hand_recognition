@@ -35,9 +35,6 @@ public interface VisionImageProcessor {
       ByteBuffer data, FrameMetadata frameMetadata, GraphicOverlay graphicOverlay)
       throws MlKitException;
 
-  /** Processes ImageProxy image data, e.g. used for CameraX live preview case. */
-  void processImageProxy(ImageProxy image, GraphicOverlay graphicOverlay) throws MlKitException;
-
   /** Stops the underlying machine learning model and release resources. */
   void stop();
 }

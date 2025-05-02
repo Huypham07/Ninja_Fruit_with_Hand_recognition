@@ -95,6 +95,7 @@ class MainActivity : AppCompatActivity() {
             if (GS.isVersusMode) {
                 gameView2.visibility = View.VISIBLE
                 gameView2.resetGame()
+                processor?.multiPlayerMode = true
             }
             pauseMenu.visibility = View.GONE
             GS.isGameStarted = true
@@ -205,7 +206,11 @@ class MainActivity : AppCompatActivity() {
 
         pauseMenu.onToggleHandDetection = { enabled ->
             if (GS.isVersusMode) {
-                Toast.makeText(applicationContext, "Hand detection is not supported in Versus mode", Toast.LENGTH_SHORT)
+                Toast.makeText(
+                    applicationContext,
+                    "Hand detection is not supported in Versus mode",
+                    Toast.LENGTH_SHORT
+                )
                     .show()
             }
             if (enabled) {
@@ -253,8 +258,10 @@ class MainActivity : AppCompatActivity() {
                     GS.isVersusMode = false
                     gameView.visibility = View.GONE
                     gameView2.visibility = View.GONE
+                    processor?.multiPlayerMode = false
                     startScreen.show()
                     GS.isGameStarted = false
+                    GS.isVersusMode = false
                     updatePauseMenuBackground()
                 }, 4000)
             }
@@ -279,7 +286,10 @@ class MainActivity : AppCompatActivity() {
                     GS.isPaused = true
                     gameView.visibility = View.GONE
                     gameView2.visibility = View.GONE
+                    processor?.multiPlayerMode = false
                     startScreen.show()
+                    GS.isGameStarted = false
+                    GS.isVersusMode = false
                     updatePauseMenuBackground()
                 }, 4000)
             }
@@ -288,20 +298,6 @@ class MainActivity : AppCompatActivity() {
         if (!allRuntimePermissionsGranted()) {
             getRuntimePermissions()
         }
-    }
-
-    /**
-     * Starts or restarts the camera source, if it exists. If the camera source doesn't exist yet
-     * (e.g., because onResume was called before the camera source was created), this will be called
-     * again when the camera source is created.
-     */
-    private fun startCameraSource() {
-            try {
-                poseViewFinder.start(cameraSource, graphicOverlay)
-            } catch (e: IOException) {
-                Log.e(TAG, "Unable to start camera source.", e)
-                cameraSource.release()
-            }
     }
 
     /** Stops the camera. */
@@ -328,7 +324,7 @@ class MainActivity : AppCompatActivity() {
 
     public override fun onDestroy() {
         super.onDestroy()
-            cameraSource.release()
+        cameraSource.release()
         getSharedPreferences("game_prefs", MODE_PRIVATE).edit {
             putInt(
                 "best_score",
@@ -390,10 +386,12 @@ class MainActivity : AppCompatActivity() {
 
     private var handTracker: HandTracker? = null
 
+    private var processor: PoseDetectorProcessor? = null
+
     private fun createCameraSource() {
         // If there's no existing cameraSource, create one.
 
-            cameraSource = CameraSource(this, graphicOverlay)
+        cameraSource = CameraSource(this, graphicOverlay)
 
         try {
             val poseDetectorOptions = PreferenceUtils.getPoseDetectorOptionsForLivePreview(this)
@@ -406,65 +404,119 @@ class MainActivity : AppCompatActivity() {
             handTracker = HandTracker(
                 movementThreshold = 3f,
                 listener = object : HandLandmarkListener {
-                    override fun onHandLandmarksReceived(
-                        leftIndexX: Float?, leftIndexY: Float?,
-                        rightIndexX: Float?, rightIndexY: Float?
+                    override fun onPlayer1HandLandmarksReceived(
+                        leftIndexX: Float?,
+                        leftIndexY: Float?,
+                        rightIndexX: Float?,
+                        rightIndexY: Float?
                     ) {
-                        processHand("left", leftIndexX, leftIndexY)
-                        processHand("right", rightIndexX, rightIndexY)
+//                        Log.d("pos1", "${leftIndexX} - ${leftIndexY}")
+                        processHandOfPlayer(1, "left", leftIndexX, leftIndexY)
+                        processHandOfPlayer(1, "right", rightIndexX, rightIndexY)
                     }
 
-                    private fun processHand(
+                    override fun onPlayer2HandLandmarksReceived(
+                        leftIndexX: Float?,
+                        leftIndexY: Float?,
+                        rightIndexX: Float?,
+                        rightIndexY: Float?
+                    ) {
+                        Log.d("pos2", "${leftIndexX} - ${leftIndexY}")
+                        processHandOfPlayer(2, "left", leftIndexX, leftIndexY)
+                        processHandOfPlayer(2, "right", rightIndexX, rightIndexY)
+                    }
+
+                    private fun processHandOfPlayer(
+                        player: Int,
                         hand: String,
                         x: Float?,
                         y: Float?
                     ) {
-                        val posX = x ?: -200f
+                        val posX: Float
+                        if (x == null) posX = -200f
+                        else {
+                            if (player == 2) {
+                                posX = x
+                            } else {
+                                posX = x - gameView.width
+                            }
+                        }
+//                        val posX = x ?: -200f
                         val posY = y ?: -200f
 
-                        val views = listOf(gameView, pauseMenu, startScreen)
+                        val views = listOf(if (player == 2) gameView else gameView2, pauseMenu, startScreen)
 
                         views.forEach { view ->
                             if (hand == "left") view.updateLeftHandPosition(posX, posY)
                             else view.updateRightHandPosition(posX, posY)
                         }
                         if (x == null || y == null) {
-                            Log.d("hand", hand)
-
                             return
                         }
-                        fruitSliceView.registerHandSlice(if (hand == "left") 1001 else 1002, x, y) // nếu có
-                        if (!GS.isEndGame) {
-                            // Gọi slice effect như dispatchTouchEvent
-                            val receiver: SliceEffectReceiver = when {
-                                pauseMenu.isVisible -> pauseMenu
-                                !GS.isGameStarted -> startScreen
-                                !GS.isPaused -> gameView
-                                else -> return
+                        if (player == 2) {
+                            fruitSliceView.registerHandSlice(
+                                if (hand == "left") 1001 else 1002,
+                                posX,
+                                posY
+                            ) // nếu có
+                            if (!GS.isEndGame) {
+                                // Gọi slice effect như dispatchTouchEvent
+                                val receiver: SliceEffectReceiver = when {
+                                    pauseMenu.isVisible -> pauseMenu
+                                    !GS.isGameStarted -> startScreen
+                                    !GS.isPaused -> gameView
+                                    else -> return
+                                }
+                                receiver.onSliceAt(posX, posY)
                             }
-                            receiver.onSliceAt(x, y)
+                        } else {
+                            fruitSliceView.registerHandSlice(
+                                if (hand == "left") 1003 else 1004,
+                                posX,
+                                posY
+                            )
+                            if (!GS.isEndGame) {
+                                // Gọi slice effect như dispatchTouchEvent
+                                val receiver: SliceEffectReceiver = when {
+                                    pauseMenu.isVisible -> pauseMenu
+                                    !GS.isGameStarted -> startScreen
+                                    !GS.isPaused -> gameView2
+                                    else -> return
+                                }
+                                receiver.onSliceAt(posX, posY)
+                            }
                         }
 
                     }
                 }
             )
 
-
-
-            val processor = PoseDetectorProcessor(
+            processor = PoseDetectorProcessor(
                 this,
                 poseDetectorOptions,
                 shouldShowInFrameLikelihood,
                 visualizeZ,
-                rescaleZ
+                rescaleZ,
+                multiPlayerMode = false
             )
 
-            processor.setHandLandmarkListener(object : HandLandmarkListener {
-                override fun onHandLandmarksReceived(
-                    leftIndexX: Float?, leftIndexY: Float?,
-                    rightIndexX: Float?, rightIndexY: Float?
+            processor?.setHandLandmarkListener(object : HandLandmarkListener {
+                override fun onPlayer1HandLandmarksReceived(
+                    leftIndexX: Float?,
+                    leftIndexY: Float?,
+                    rightIndexX: Float?,
+                    rightIndexY: Float?
                 ) {
-                    handTracker?.update(leftIndexX, leftIndexY, rightIndexX, rightIndexY)
+                    handTracker?.updatePlayer1(leftIndexX, leftIndexY, rightIndexX, rightIndexY)
+                }
+
+                override fun onPlayer2HandLandmarksReceived(
+                    leftIndexX: Float?,
+                    leftIndexY: Float?,
+                    rightIndexX: Float?,
+                    rightIndexY: Float?
+                ) {
+                    handTracker?.updatePlayer2(leftIndexX, leftIndexY, rightIndexX, rightIndexY)
                 }
             })
 
@@ -479,7 +531,21 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
     }
-    
+
+    /**
+     * Starts or restarts the camera source, if it exists. If the camera source doesn't exist yet
+     * (e.g., because onResume was called before the camera source was created), this will be called
+     * again when the camera source is created.
+     */
+    private fun startCameraSource() {
+        try {
+            poseViewFinder.start(cameraSource, graphicOverlay)
+        } catch (e: IOException) {
+            Log.e(TAG, "Unable to start camera source.", e)
+            cameraSource.release()
+        }
+    }
+
     private fun enableFullScreen() {
         @Suppress("DEPRECATION")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
