@@ -42,6 +42,7 @@ jobs:
           name: Ninja Fruit ${{ github.ref_name }}
           draft: false
           prerelease: false
+          update_existing: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
