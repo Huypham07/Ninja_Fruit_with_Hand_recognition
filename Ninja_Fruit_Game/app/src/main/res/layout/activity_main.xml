@@ -10,12 +10,6 @@
         android:layout_height="wrap_content"
         android:visibility="visible"/>
 
-    <androidx.camera.view.PreviewView
-        android:id="@+id/viewFinder"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"/>
-
     <com.hci.ninjafruitgame.view.vision.GraphicOverlay
         android:id="@+id/graphic_overlay"
         android:layout_width="match_parent"

@@ -18,12 +18,7 @@ import android.view.WindowInsetsController
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
@@ -42,20 +37,13 @@ import com.hci.ninjafruitgame.view.game.StartScreenView
 import com.hci.ninjafruitgame.view.vision.CameraSource
 import com.hci.ninjafruitgame.view.vision.CameraSourcePreview
 import com.hci.ninjafruitgame.view.vision.GraphicOverlay
-import com.hci.ninjafruitgame.view.vision.MediaPipeHandGraphic
-import com.hci.ninjafruitgame.view.vision.MediapipeHandProcessor
 import java.io.IOException
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 import com.hci.ninjafruitgame.model.GameState as GS
 
 class MainActivity : AppCompatActivity() {
     private lateinit var cameraSource: CameraSource
     private lateinit var poseViewFinder: CameraSourcePreview
-
-    private lateinit var viewFinder: PreviewView
     private lateinit var graphicOverlay: GraphicOverlay
 
     private var mediaPlayer: MediaPlayer? = null
@@ -67,12 +55,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var countdownOverlay: CountdownOverlay
     private lateinit var pauseMenu: PauseMenuView
     private lateinit var btnPause: ImageView
-
-    private lateinit var cameraExecutor: ExecutorService
-    private lateinit var handProcessor: MediapipeHandProcessor
-    private lateinit var cameraProvider: ProcessCameraProvider
-    private lateinit var imageAnalysis: ImageAnalysis
-    private lateinit var preview: Preview
 
 
     @ExperimentalGetImage
@@ -92,15 +74,10 @@ class MainActivity : AppCompatActivity() {
         pauseMenu = findViewById(R.id.pauseMenuContent)
         countdownOverlay = findViewById(R.id.countdownOverlay)
         btnPause = findViewById(R.id.btnPause)
-        viewFinder = findViewById(R.id.viewFinder)
         graphicOverlay = findViewById(R.id.graphic_overlay)
         poseViewFinder = findViewById(R.id.poseViewFinder)
 
         PreferenceUtils.hideDetectionInfo(this)
-
-        createCameraSource()
-        startCameraSource()
-//        setupHandDetection()
 
         updatePauseMenuBackground()
 
@@ -121,6 +98,7 @@ class MainActivity : AppCompatActivity() {
             }
             pauseMenu.visibility = View.GONE
             GS.isGameStarted = true
+            GS.isPaused = false
             updatePauseMenuBackground()
         }
 
@@ -226,30 +204,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         pauseMenu.onToggleHandDetection = { enabled ->
-            GS.isUseHandTracker = enabled
-            GS.isUseCamera = enabled
+            if (GS.isVersusMode) {
+                Toast.makeText(applicationContext, "Hand detection is not supported in Versus mode", Toast.LENGTH_SHORT)
+                    .show()
+            }
             if (enabled) {
+                GS.isUseHandTracker = enabled
+                GS.isUseCamera = enabled
                 graphicOverlay.visibility = View.VISIBLE
-                if (GS.isVersusMode) {
-                    viewFinder.visibility = View.VISIBLE
-
-                    setupHandDetection()
-                } else {
-                    poseViewFinder.visibility = View.VISIBLE
-                    createCameraSource()
-                    startCameraSource()
-                }
+                poseViewFinder.visibility = View.VISIBLE
+                createCameraSource()
+                startCameraSource()
                 Toast.makeText(applicationContext, "Hand detection enabled", Toast.LENGTH_SHORT)
                     .show()
             } else {
+                GS.isUseHandTracker = enabled
+                GS.isUseCamera = enabled
                 graphicOverlay.visibility = View.GONE
-                if (GS.isVersusMode) {
-                    viewFinder.visibility = View.GONE
-                    closeHandDetection()
-                } else {
-                    poseViewFinder.visibility = View.GONE
-                    cameraSource.stop()
-                }
+                poseViewFinder.visibility = View.GONE
+                cameraSource.stop()
 
                 Toast.makeText(applicationContext, "Hand detection disabled", Toast.LENGTH_SHORT)
                     .show()
@@ -331,96 +304,6 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    @ExperimentalGetImage
-    private fun setupHandDetection() {
-        cameraExecutor = Executors.newSingleThreadExecutor()
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-        cameraProviderFuture.addListener({
-            cameraProvider = cameraProviderFuture.get()
-
-            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-
-            preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(viewFinder.surfaceProvider)
-            }
-
-            imageAnalysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                .build()
-                .also {
-                    it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        handProcessor.detectLiveStream(imageProxy, true)
-                    }
-                }
-
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
-
-        }, ContextCompat.getMainExecutor(this))
-
-        cameraExecutor.execute {
-            handProcessor = MediapipeHandProcessor(
-                context = this,
-                overlay = graphicOverlay,
-                minHandDetectionConfidence = MediapipeHandProcessor.DEFAULT_HAND_DETECTION_CONFIDENCE,
-                minHandTrackingConfidence = MediapipeHandProcessor.DEFAULT_HAND_TRACKING_CONFIDENCE,
-                minHandPresenceConfidence = MediapipeHandProcessor.DEFAULT_HAND_PRESENCE_CONFIDENCE,
-                maxNumHands = 2,
-                currentDelegate = MediapipeHandProcessor.DELEGATE_GPU,
-                handLandmarkerHelperListener = object : MediapipeHandProcessor.LandmarkerListener {
-                    override fun onError(error: String) {
-                        TODO("Not yet implemented")
-                    }
-
-                    override fun onResults(resultBundle: MediapipeHandProcessor.ResultBundle) {
-                        graphicOverlay.clear()
-                        graphicOverlay.add(MediaPipeHandGraphic(graphicOverlay, resultBundle.results))
-                        graphicOverlay.postInvalidate()
-
-                        val width = graphicOverlay.width
-                        val height = graphicOverlay.height
-
-                        val leftHandX = resultBundle.leftHandTip?.getOrNull(0)?.times(width) ?: -200f
-                        val leftHandY = resultBundle.leftHandTip?.getOrNull(1)?.times(height) ?: -200f
-                        val rightHandX = resultBundle.rightHandTip?.getOrNull(0)?.times(width) ?: -200f
-                        val rightHandY = resultBundle.rightHandTip?.getOrNull(1)?.times(height) ?: -200f
-
-                        val views = listOf(gameView, pauseMenu, startScreen)
-
-                        views.forEach { view ->
-                            view.updateLeftHandPosition(leftHandX, leftHandY)
-                            view.updateRightHandPosition(rightHandX, rightHandY)
-                        }
-
-                        if (leftHandX > 0) {
-                            fruitSliceView.registerHandSlice(1001, leftHandX, leftHandY)
-                        } else {
-                            fruitSliceView.clearHandSlice(1001)
-                        }
-
-                        if (rightHandX > 0) {
-                            fruitSliceView.registerHandSlice(1002, rightHandX, rightHandY)
-                        } else {
-                            fruitSliceView.clearHandSlice(1002)
-                        }
-                    }
-
-                }
-            )
-        }
-    }
-
-    private fun closeHandDetection() {
-        if (this::handProcessor.isInitialized) {
-            cameraExecutor.execute { handProcessor.clearHandLandmarker() }
-        }
-        cameraExecutor.shutdown()
-        cameraExecutor.awaitTermination(
-            Long.MAX_VALUE, TimeUnit.NANOSECONDS
-        )
-    }
-
     /** Stops the camera. */
     override fun onPause() {
         super.onPause()
@@ -428,13 +311,7 @@ class MainActivity : AppCompatActivity() {
             mediaPlayer?.pause()
         }
         if (GS.isUseHandTracker) {
-            if (GS.isVersusMode) {
-                if (this::handProcessor.isInitialized && this::cameraExecutor.isInitialized) {
-                    cameraExecutor.execute { handProcessor.clearHandLandmarker() }
-                }
-            } else {
-                poseViewFinder.stop()
-            }
+            poseViewFinder.stop()
         }
     }
 
@@ -444,14 +321,8 @@ class MainActivity : AppCompatActivity() {
             mediaPlayer?.start()
         }
         if (GS.isUseHandTracker) {
-            if (GS.isVersusMode) {
-                if (this::handProcessor.isInitialized && this::cameraExecutor.isInitialized && handProcessor.isClose()) {
-                    cameraExecutor.execute { handProcessor.setupHandLandmarker() }
-                }
-            } else {
-                createCameraSource()
-                startCameraSource()
-            }
+            createCameraSource()
+            startCameraSource()
         }
     }
 
@@ -548,19 +419,19 @@ class MainActivity : AppCompatActivity() {
                         x: Float?,
                         y: Float?
                     ) {
-                        if (x == null || y == null) return
+                        val posX = x ?: -200f
+                        val posY = y ?: -200f
 
-                        when (hand) {
-                            "left" -> {
-                                gameView.updateLeftHandPosition(x, y)
-                                startScreen.updateLeftHandPosition(x, y)
-                                pauseMenu.updateLeftHandPosition(x, y)
-                            }
-                            "right" -> {
-                                gameView.updateRightHandPosition(x, y)
-                                startScreen.updateRightHandPosition(x, y)
-                                pauseMenu.updateRightHandPosition(x, y)
-                            }
+                        val views = listOf(gameView, pauseMenu, startScreen)
+
+                        views.forEach { view ->
+                            if (hand == "left") view.updateLeftHandPosition(posX, posY)
+                            else view.updateRightHandPosition(posX, posY)
+                        }
+                        if (x == null || y == null) {
+                            Log.d("hand", hand)
+
+                            return
                         }
                         fruitSliceView.registerHandSlice(if (hand == "left") 1001 else 1002, x, y) // nếu có
                         if (!GS.isEndGame) {

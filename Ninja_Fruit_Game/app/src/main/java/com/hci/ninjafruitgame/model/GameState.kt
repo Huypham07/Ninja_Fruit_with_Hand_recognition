@@ -5,8 +5,8 @@ object  GameState {
     var isEndGame = false
     var isPaused = false
     var isGameStarted = false
-    var isUseHandTracker = true
-    var isUseCamera = true
+    var isUseHandTracker = false
+    var isUseCamera = false
     var isMusicEnabled = true
     var isVersusMode = false
 
