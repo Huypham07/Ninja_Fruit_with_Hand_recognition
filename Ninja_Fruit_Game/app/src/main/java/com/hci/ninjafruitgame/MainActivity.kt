@@ -96,6 +96,8 @@ class MainActivity : AppCompatActivity() {
                 gameView2.visibility = View.VISIBLE
                 gameView2.resetGame()
                 processor?.multiPlayerMode = true
+            } else {
+                processor?.multiPlayerMode = false
             }
             pauseMenu.visibility = View.GONE
             GS.isGameStarted = true
@@ -368,10 +370,12 @@ class MainActivity : AppCompatActivity() {
                     pauseMenu.isVisible -> pauseMenu
                     !GS.isGameStarted -> startScreen
                     !GS.isPaused -> {
-                        if (x < gameView.width) gameView else {
-                            x -= gameView.width
-                            gameView2
-                        }
+                        if (GS.isVersusMode) {
+                            if (x < gameView.width) gameView else {
+                                x -= gameView.width
+                                gameView2
+                            }
+                        } else gameView
                     }
 
                     else -> continue
@@ -395,7 +399,7 @@ class MainActivity : AppCompatActivity() {
 
         try {
             val poseDetectorOptions = PreferenceUtils.getPoseDetectorOptionsForLivePreview(this)
-            Log.i(TAG, "Using Pose Detector with options $poseDetectorOptions")
+
             val shouldShowInFrameLikelihood =
                 PreferenceUtils.shouldShowPoseDetectionInFrameLikelihoodLivePreview(this)
             val visualizeZ = PreferenceUtils.shouldPoseDetectionVisualizeZ(this)
@@ -410,7 +414,6 @@ class MainActivity : AppCompatActivity() {
                         rightIndexX: Float?,
                         rightIndexY: Float?
                     ) {
-//                        Log.d("pos1", "${leftIndexX} - ${leftIndexY}")
                         processHandOfPlayer(1, "left", leftIndexX, leftIndexY)
                         processHandOfPlayer(1, "right", rightIndexX, rightIndexY)
                     }
@@ -421,7 +424,6 @@ class MainActivity : AppCompatActivity() {
                         rightIndexX: Float?,
                         rightIndexY: Float?
                     ) {
-                        Log.d("pos2", "${leftIndexX} - ${leftIndexY}")
                         processHandOfPlayer(2, "left", leftIndexX, leftIndexY)
                         processHandOfPlayer(2, "right", rightIndexX, rightIndexY)
                     }
@@ -432,20 +434,31 @@ class MainActivity : AppCompatActivity() {
                         x: Float?,
                         y: Float?
                     ) {
-                        val posX: Float
-                        if (x == null) posX = -200f
+                        val posX: Float = if (x == null) -200f
                         else {
-                            if (player == 2) {
-                                posX = x
+                            if (GS.isVersusMode) {
+                                if (player == 2) {
+                                    x
+                                } else {
+                                    x - gameView.width
+                                }
                             } else {
-                                posX = x - gameView.width
+                                x
                             }
                         }
 //                        val posX = x ?: -200f
                         val posY = y ?: -200f
 
-                        val views = listOf(if (player == 2) gameView else gameView2, pauseMenu, startScreen)
+                        var views =
+                            listOf(if (player == 1) gameView else gameView2, pauseMenu, startScreen)
 
+                        if (GS.isVersusMode) {
+                            views = listOf(
+                                if (player == 2) gameView else gameView2,
+                                pauseMenu,
+                                startScreen
+                            )
+                        }
                         views.forEach { view ->
                             if (hand == "left") view.updateLeftHandPosition(posX, posY)
                             else view.updateRightHandPosition(posX, posY)
@@ -453,42 +466,79 @@ class MainActivity : AppCompatActivity() {
                         if (x == null || y == null) {
                             return
                         }
-                        if (player == 2) {
-                            fruitSliceView.registerHandSlice(
-                                if (hand == "left") 1001 else 1002,
-                                posX,
-                                posY
-                            ) // nếu có
-                            if (!GS.isEndGame) {
-                                // Gọi slice effect như dispatchTouchEvent
-                                val receiver: SliceEffectReceiver = when {
-                                    pauseMenu.isVisible -> pauseMenu
-                                    !GS.isGameStarted -> startScreen
-                                    !GS.isPaused -> gameView
-                                    else -> return
+                        if (GS.isVersusMode) {
+                            if (player == 2) {
+                                fruitSliceView.registerHandSlice(
+                                    if (hand == "left") 1005 else 1006,
+                                    posX,
+                                    posY
+                                ) // nếu có
+                                if (!GS.isEndGame) {
+                                    // Gọi slice effect như dispatchTouchEvent
+                                    val receiver: SliceEffectReceiver = when {
+                                        pauseMenu.isVisible -> pauseMenu
+                                        !GS.isGameStarted -> startScreen
+                                        !GS.isPaused -> gameView
+                                        else -> return
+                                    }
+                                    receiver.onSliceAt(posX, posY)
                                 }
-                                receiver.onSliceAt(posX, posY)
+                            } else {
+                                fruitSliceView.registerHandSlice(
+                                    if (hand == "left") 1007 else 1008,
+                                    posX + gameView.width,
+                                    posY
+                                )
+                                if (!GS.isEndGame) {
+                                    // Gọi slice effect như dispatchTouchEvent
+                                    val receiver: SliceEffectReceiver = when {
+                                        pauseMenu.isVisible -> pauseMenu
+                                        !GS.isGameStarted -> startScreen
+                                        !GS.isPaused -> gameView2
+                                        else -> return
+                                    }
+                                    receiver.onSliceAt(posX, posY)
+                                }
                             }
                         } else {
-                            fruitSliceView.registerHandSlice(
-                                if (hand == "left") 1003 else 1004,
-                                posX,
-                                posY
-                            )
-                            if (!GS.isEndGame) {
-                                // Gọi slice effect như dispatchTouchEvent
-                                val receiver: SliceEffectReceiver = when {
-                                    pauseMenu.isVisible -> pauseMenu
-                                    !GS.isGameStarted -> startScreen
-                                    !GS.isPaused -> gameView2
-                                    else -> return
+                            if (player == 1) {
+                                fruitSliceView.registerHandSlice(
+                                    if (hand == "left") 1001 else 1002,
+                                    posX,
+                                    posY
+                                ) // nếu có
+                                if (!GS.isEndGame) {
+                                    // Gọi slice effect như dispatchTouchEvent
+                                    val receiver: SliceEffectReceiver = when {
+                                        pauseMenu.isVisible -> pauseMenu
+                                        !GS.isGameStarted -> startScreen
+                                        !GS.isPaused -> gameView
+                                        else -> return
+                                    }
+                                    receiver.onSliceAt(posX, posY)
                                 }
-                                receiver.onSliceAt(posX, posY)
+                            } else {
+                                fruitSliceView.registerHandSlice(
+                                    if (hand == "left") 1003 else 1004,
+                                    posX,
+                                    posY
+                                )
+                                if (!GS.isEndGame) {
+                                    // Gọi slice effect như dispatchTouchEvent
+                                    val receiver: SliceEffectReceiver = when {
+                                        pauseMenu.isVisible -> pauseMenu
+                                        !GS.isGameStarted -> startScreen
+                                        !GS.isPaused -> gameView2
+                                        else -> return
+                                    }
+                                    receiver.onSliceAt(posX, posY)
+                                }
                             }
                         }
-
                     }
+
                 }
+
             )
 
             processor = PoseDetectorProcessor(
